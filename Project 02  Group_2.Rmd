@@ -1,6 +1,6 @@
 
 ---
-title: "PROJECT 01: Spatial Distribution of Fire Incidents in D.C., Maryland, and Virginia in 2018"
+title: "PROJECT 01: Predicting Fire Causes in D.C., Maryland, and Virginia (2018) Using Machine Learning
 author: |
   Jeongwon Yoo  
   Simbanegavi Simbarashe  
