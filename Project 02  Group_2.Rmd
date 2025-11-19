@@ -1,0 +1,1042 @@
+
+---
+title: "PROJECT 01: Spatial Distribution of Fire Incidents in D.C., Maryland, and Virginia in 2018"
+author: |
+  Jeongwon Yoo  
+  Simbanegavi Simbarashe  
+  Nithin Ravindra Reddy  
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+# Set CRAN mirror
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+
+# Install required packages if they are not already installed
+required_packages <- c("sf", "ggplot2", "viridis", "dplyr", "lubridate")
+new_packages <- required_packages[!(required_packages %in% installed.packages()[, "Package"])]
+if (length(new_packages)) {
+  install.packages(new_packages)
+}
+
+# Load libraries
+library(sf)
+library(ggplot2)
+library(viridis)
+library(dplyr)
+library(lubridate)
+library(tigris)
+library(readr)
+library(tidyr)
+library(corrplot)
+library(spdep)
+library(spatialreg)
+
+```
+
+
+```{r}
+# Set global chunk options
+knitr::opts_chunk$set(echo = TRUE, results = "markup", warning = FALSE, message = FALSE)
+
+# Set options for number display format
+options(scientific = TRUE, digits = 3)
+```
+#  CHAPTER 1: Introduction
+
+## 1.0 Overview
+
+In 2018, the U.S. experienced approximately 1.3 million fires, resulting in over 3,600 civilian deaths and $25.6 billion in property damage. Structure fires made up a significant portion of these incidents, with 499,000 fires causing over $12 billion in damage, largely due to major wildfires in California. The number of fires remained stable compared to the previous year, but average property loss per structure fire increased for example. The total 2018 fire costs in California approached $24 billion (National Fire Protection Association,(2019))
+
+The spatial pattern of fire incidents is a critical area of study, particularly in urban environments where population density and infrastructure can significantly influence fire dynamics. This research project focuses on the spatial distribution of fire incidents in Washington, D.C., Maryland, and Virginia, examining how geographic and environmental factors contribute to the occurrence and frequency of fires.
+
+## 1.1 Objectives
+
+Analyze the spatial distribution of fire incidents across Washington, D.C., Maryland, and Virginia, identifying geographic hotspots and patterns in urban versus rural areas.
+
+Investigate the role of environmental factors, such as weather conditions and vegetation, in influencing the incidence of fires in the studied regions during 2018.
+
+Categorize types of fire incidents (e.g., residential, commercial, vehicle) and assess their causes, comparing urban and rural settings to identify specific risk factors.**
+
+## 1.2 Research Questions
+
+What geographic patterns can be identified in the distribution of fire incidents across Washington, D.C., Maryland, and Virginia in 2018?
+
+How do environmental factors influence the incidence of fires in the studied regions during 2018?
+
+What types of fire incidents were most prevalent, and what are the specific causes associated with these incidents in both urban and rural settings?
+
+## 1.3 Significance of the Study
+
+This project study enhances understanding of fire incident dynamics in Washington, D.C., Maryland, and Virginia. Findings can inform policymakers and emergency services about high-risk areas and the underlying causes of fires, facilitating targeted prevention strategies and improving public safety initiatives.
+
+## 1.4 Weakness of the Study
+
+# 1.4.1 Data Limitations
+
+-Incomplete or Inaccurate Data: Fire incident data is incomplete, inaccurately reported, or inconsistent across jurisdictions.
+Data Resolution: The study relies on aggregated data (e.g., by zip codes or counties), which masks finer spatial patterns at the neighborhood or block level.
+-Temporal Resolution: The analysis focuses only on the annual aggregate, ignoring seasonal or time-of-day variations in fire incidents.
+Data Sources Variability: Variability in how fire incidents are recorded across different jurisdictions (e.g., D.C., Maryland, and Virginia) leads to inconsistencies in the dataset.
+
+# 1.4.2 Methodological Weaknesses
+
+-Simplistic Geographic Analysis: The spatial analysis does not account for key geographic factors such as population density, land use, or proximity to fire stations, which causes the results to lack depth.
+Spatial Autocorrelation Ignored: Fire incidents are spatially clustered, and the failure to account for spatial autocorrelation leads to biased statistical inferences.
+-Lack of Multivariate Analysis: The study does not incorporate socioeconomic, demographic, or environmental factors, which overlooks critical drivers of fire incidents.
+
+# 1.4.3 Scope and Generalizability
+
+-Limited Focus on 2018: The study focuses on a single year, which does not capture long-term trends or anomalies in fire incidents.
+-Regional Focus: While D.C., Maryland, and Virginia are geographically close, they have diverse urban, suburban, and rural areas. Aggregating data across these regions obscures localized patterns.
+-Exclusion of Other Hazards: A focus solely on fire incidents ignores other hazards (e.g., floods or storms) that interact with fire risk.
+
+#  CHAPTER 2: Methodology
+## 2.0 Dataset
+
+This project utilized the US Wildfire Dataset from Kaggle, comprising approximately 1.9 million observations of wildfire incidents across the United States. For this analysis, approximately 17,000 fire incidents from D.C., Maryland, and Virginia in 2018 were filtered from the main dataset.
+
+spatial data for project study area (DC,MD AND VA) were downloaded from Diva GIS (https://diva-gis.org/data.html)
+
+## 2.1 Software
+
+The following software was used for this project:
+
+R and R Markdown
+
+GitHub (GitHub Repository)
+
+Microsoft Excel
+
+## 2.2 Project Study Area
+The study was conducted in 3 states namely DC,VA and MD
+
+```{r load_and_display_study_area}
+
+# Specify the path to your study area shapefile
+shapefile_path <- "C:/Users/SIMBAH/Desktop/Intro to Data science/Project/DC_MD_VA Boundaries/Project_Area.shp"
+
+# Load the shapefile
+Study_Area <- st_read(shapefile_path)
+
+# Check the CRS
+print(st_crs(Study_Area))
+
+# Transform to NAD83 / UTM Zone 18N (EPSG:26918)
+Study_Area <- st_transform(Study_Area, crs = 26918)
+
+# View the structure of the shapefile data
+#str(Study_Area)
+
+# Plot the data with labels
+library(ggplot2)
+library(viridis)
+
+ggplot(data = Study_Area) +
+  geom_sf(aes(fill = NAME_1), color = "Green") +  # Fill by NAME_1 and add a border
+  geom_sf_text(aes(label = NAME_1), size = 3, check_overlap = TRUE, color = "black", fontface = "bold") +  # Add labels in bold black
+  scale_fill_viridis_d(option = "C", name = "Key") +  # Update legend title to "Key"
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),  # Center the title
+    legend.position = "right"  # Position the legend on the right
+  ) +
+  ggtitle("Project Study Area Map")
+```
+
+# CHAPTER 2: Analysis and Results
+
+# 3.1 Objective 1: Categorize Types of Fire Incidents and Assess Causes
+
+```{r init, include=F}
+library(ezids)
+library(ggplot2)
+library(treemapify)
+```
+
+## 3.1.1 Read dataset
+```{r}
+fire <- read.csv("Fire incidences DC_VA_MD_cleands.csv")
+```
+
+
+## 3.1.2 Quick overview
+```{r}
+str(fire)
+head(fire)
+```
+
+## 3.1.3 summary 
+```{r}
+xkablesummary(fire, title = "Fire Statistics Summary")
+```
+
+## 3.1.4 CATEGORIZATION: Fire Incident Types and Causes
+
+```{r}
+table(fire$NWCG_CAUSE_CLASSIFICATION)
+```
+
+## 3.1.5 Bar Chart
+```{r}
+ggplot(fire, aes(x = NWCG_CAUSE_CLASSIFICATION)) +
+  geom_bar(col = "black", fill = "white", alpha = 0.7) +
+  labs(title = "Fire Cause Classification",
+       x = "Cause Classification",
+       y = "Number of Incidents")
+```
+
+## 3.1.6 Frequency count of causes
+```{r}
+general_cause_counts <- table(fire$NWCG_GENERAL_CAUSE)
+general_cause_counts <- sort(general_cause_counts, decreasing = TRUE)
+general_cause_counts
+```
+
+```{r}
+fire_cause_summary <- as.data.frame(table(fire$NWCG_GENERAL_CAUSE))
+colnames(fire_cause_summary) <- c("Cause", "Count")
+ggplot(fire_cause_summary, aes(area = Count, fill = Cause, label = paste(Cause, "\n", Count))) +
+  geom_treemap() +
+  geom_treemap_text(colour = "white", place = "centre", grow = TRUE) +
+  labs(title = "Fire Incident Causes",
+       subtitle = "Proportion of Each General Cause across All Regions") +
+  theme(legend.position = "none")
+```
+
+## 3.1.7 Segregation based on states
+
+```{r}
+table(fire$STATE)
+```
+
+## 3.1.8 Bar chart on fire incidences in States.
+
+```{r}
+state_counts <- table(fire$STATE)
+barplot(state_counts,
+        main = "Fire Incidents by State",
+        xlab = "State",
+        ylab = "Number of Incidents",
+        col = "red")
+``` 
+
+## 3.1.9 Classification of urban and rural counties in DC,MD and VA.
+
+```{r}
+urban_counties <- c("Washington, D.C.",
+                    "Montgomery County", "Prince George's County", "Baltimore City",
+                    "Anne Arundel County", "Howard County",
+                    "Fairfax County", "Arlington County", "Virginia Beach City",
+                    "Chesterfield County", "Henrico County", "Loudoun County")
+
+rural_counties <- c("Garrett County", "Allegany County", "Washington County",
+                    "Caroline County", "Somerset County", "Dorchester County",
+                    "Bath County", "Highland County", "Scott County",
+                    "Lee County", "Tazewell County", "Wise County")
+
+# Create new Area Type variable
+fire$AREA_TYPE <- ifelse(fire$FIPS_NAME %in% urban_counties, "Urban", "Rural")
+# View distribution
+table(fire$AREA_TYPE)
+```
+```{r}
+ggplot(fire, aes(x = AREA_TYPE, y = FIRE_SIZE, fill = AREA_TYPE)) +
+  geom_boxplot(alpha = 0.7, color = "black", outlier.colour = "red") +
+  labs(title = "Fire Size Distribution by Area Type",
+       x = "Area Type",
+       y = "Fire Size") +
+  scale_fill_manual(values = c("blue", "orange", "black")) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        axis.text.x = element_text(angle = 0, hjust = 0.5))
+```
+
+## 3.1.10 Frequency table of causes by area type
+
+```{r}
+cause_table <- table(fire$AREA_TYPE, fire$NWCG_GENERAL_CAUSE)
+cause_table
+```
+
+## 3.1.11 Distibution of fire cause by area type
+
+```{r}
+ggplot(data = fire, aes(x = NWCG_GENERAL_CAUSE, fill = AREA_TYPE)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of Fire Causes by Area Type",
+       x = "General Cause", y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## 3.1.12 Identify risk factors associated with different areas.
+
+```{r}
+risk_factor <- chisq.test(table(fire$AREA_TYPE, fire$NWCG_GENERAL_CAUSE))
+risk_factor
+```
+This means there is a strong association between area type and fire cause.
+
+## 3.1.13 Normality Check for Fire Size
+```{r}
+qqnorm(fire$FIRE_SIZE, main = "Fire Size") ## Assess whether the distribution of fire sizes follows a normal distribution.
+qqline(fire$FIRE_SIZE)
+```
+
+There’s a significant deviation from the normal line, especially in the upper tail which tells extremely large fires occur more frequently than expected under a normal distribution.
+
+# 3.2 Objective 2
+
+## 3.2.1 EXPLORATORY DATA ANALYSIS
+
+```{r load_fire_data, echo=TRUE}
+# Load necessary libraries
+library(dplyr)
+
+# Load the fire incidence CSV file
+fire_data_path <- "C:/Users/SIMBAH/Desktop/Intro to Data science/Project/Fire incidences DC_VA_MD_cleaned.csv" # Update with your actual path
+fire_data <- read.csv(fire_data_path)
+
+# Examine the structure of the data
+str(fire_data)
+```
+
+## 3.2.2 Summary Statistics
+
+```{r summary_statistics, echo=TRUE}
+# Summary statistics
+summary(fire_data)
+
+# Check for missing values
+missing_values <- colSums(is.na(fire_data))
+print(missing_values)
+```
+
+## 3.2.3 Distribution of Fire Incidences
+
+```{r total_fire_incidents_by_state_filtered, echo=TRUE, fig.width=8, fig.height=4}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Summarize total fire incidents by state (counting rows)
+fire_data_summary <- fire_data %>%
+  group_by(STATE) %>%
+  summarise(total_fire_count = n()) %>%
+  filter(total_fire_count > 1)  # Exclude states with 1 incident or less
+
+# Check the summarized data to verify filtering
+print(fire_data_summary)
+
+# Create a bar graph for total incidents by state
+ggplot(fire_data_summary, aes(x = STATE, y = total_fire_count, fill = STATE)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = total_fire_count), vjust = -0.5) +  # Add labels above bars
+  theme_minimal() +
+  ggtitle("Total Fire Incidences by State in 2018") +
+  xlab("STATE") +
+  ylab("Total Number of Fire Incidents") +
+  scale_fill_manual(values = c("VA" = "lightblue", "MD" = "lightcoral")) +  # Only include states with incidents
+  theme(legend.title = element_blank())
+```
+
+## 3.2.4 Heatmap of incidences by month and state
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+
+# Load the fire incidence CSV file
+fire_data_path <- "C:/Users/SIMBAH/Desktop/Intro to Data science/Project/Fire incidences DC_VA_MD_cleaned.csv"  # Update with your actual path
+fire_data <- read.csv(fire_data_path)
+
+# Convert Month to a factor with the correct order
+fire_data$Month <- factor(fire_data$Month, levels = c(
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+))
+
+# Create a summary of total incidents by month and state
+heatmap_data <- fire_data %>%
+  group_by(Month, STATE) %>%
+  summarise(total_incidents = n(), .groups = 'drop')  # Count incidents
+
+# Create the heatmap
+ggplot(heatmap_data, aes(x = Month, y = STATE, fill = total_incidents)) +
+  geom_tile(color = "white") +  # Add tiles
+  scale_fill_gradient(low = "white", high = "Red") +  # Color gradient
+  theme_minimal() +
+  ggtitle("Heatmap of Fire Incidents by Month and State in 2018") +
+  xlab("Month") +
+  ylab("State") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels
+```
+
+## 3.2.5 Fire Incidents by Cause
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+
+# Load the fire incidence CSV file
+#fire_data_path <- "C:/Users/SIMBAH/Desktop/Intro to Data science/Project/Fire incidences DC_VA_MD_cleaned.csv"  # Update with your actual path
+#fire_data <- read.csv(fire_data_path)
+
+# Convert Month to a factor with the correct order
+fire_data$Month <- factor(fire_data$Month, levels = c(
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+))
+
+# Ensure that the Year column is present. If not, you can create it from a date column.
+# For example, if you have a column called 'Date':
+# fire_data$FIRE_YEAR <- format(as.Date(fire_data$Date), "%Y")
+
+# Create a summary of total incidents by year, month, and cause
+cause_summary <- fire_data %>%
+  group_by(FIRE_YEAR, Month, NWCG_GENERAL_CAUSE) %>%
+  summarise(total_incidents = n(), .groups = 'drop')  # Count incidents
+
+# Visualize the data using a line plot
+ggplot(cause_summary, aes(x = interaction(FIRE_YEAR, Month), y = total_incidents, color = NWCG_GENERAL_CAUSE)) +
+  geom_line() +  # Line plot for trends
+  geom_point() +  # Add points for clarity
+  scale_x_discrete(labels = function(x) gsub("\\s+", " ", x)) +  # Clean up x-axis labels
+  theme_minimal() +
+  ggtitle("Fire Incidents by Cause DC,MV, VA 2008") +
+  xlab("Month") +
+  ylab("Total Incidents") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels
+```
+
+## 3.2.6 Fire cause classification
+
+```{r}
+cause_summary <- fire_data %>%
+  group_by(NWCG_GENERAL_CAUSE) %>%
+  summarise(total_incidents = n())
+
+ggplot(cause_summary, aes(x = reorder(NWCG_GENERAL_CAUSE, total_incidents), y = total_incidents, fill = NWCG_GENERAL_CAUSE)) +
+  geom_bar(stat = "identity", color = "black") +
+  coord_flip() +
+  theme_minimal() +
+  ggtitle("Fire Incidents by Cause") +
+  xlab("Cause") +
+  ylab("Total Number of Fire Incidents")
+```
+
+## 3.2.7 Fire incidence by cause and  state
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+
+# Load the fire incidence CSV file
+#fire_data_path <- "C:/Users/SIMBAH/Desktop/Intro to Data science/Project/Fire incidences DC_VA_MD_cleaned.csv"  # Update with your actual path
+#fire_data <- read.csv(fire_data_path)
+
+# Create a summary of total incidents by cause and state
+cause_summary <- fire_data %>%
+  group_by(STATE, NWCG_GENERAL_CAUSE) %>%
+  summarise(total_incidents = n(), .groups = 'drop')  # Count incidents
+
+# Visualize the data using a bar plot
+ggplot(cause_summary, aes(x = reorder(NWCG_GENERAL_CAUSE, total_incidents), y = total_incidents, fill = STATE)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +  # Use position = "dodge" to separate bars by state
+  coord_flip() +
+  theme_minimal() +
+  ggtitle("Fire Incidents by Cause and State") +
+  xlab("Cause") +
+  ylab("Total Number of Fire Incidents") +
+  scale_fill_brewer(palette = "Set1")  # Optional: Use a color palette for better distinction
+```
+
+## 3.2.8 Fire Incidences by Ownership
+
+```{r}
+ownership_summary <- fire_data %>%
+  group_by(OWNER_DESCR) %>%
+  summarise(total_incidents = n())
+
+ggplot(ownership_summary, aes(x = "", y = total_incidents, fill = OWNER_DESCR)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y") +
+  theme_minimal() +
+  ggtitle("Proportion of Fire Incidents by Ownership") +
+  ylab("")
+```
+
+# 3.2.9 Average fire size by cause
+
+```{r}
+# Load necessary libraries
+library(tidyverse)
+library(ggplot2)
+
+# Load the dataset
+fire_data <- read.csv("C:/Users/SIMBAH/Desktop/Intro to Data science/Project/Fire incidences DC_VA_MD_cleaned.csv")
+
+# Sample code to create a basic map using ggplot2
+# Average fire size by cause
+size_analysis <- fire_data %>%
+  group_by(NWCG_GENERAL_CAUSE) %>%
+  summarise(avg_fire_size = mean(FIRE_SIZE, na.rm = TRUE), 
+            avg_cont_time = mean(CONT_TIME, na.rm = TRUE))
+
+# Plotting
+ggplot(size_analysis, aes(x = reorder(NWCG_GENERAL_CAUSE, -avg_fire_size), y = avg_fire_size)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "Average Fire Size by Cause", x = "Cause", y = "Average Fire Size") +
+  theme_minimal()
+```
+
+
+## 3.2.10 Geographic Distribution of Fire Incidences by cause
+
+```{r}
+# Load necessary libraries
+library(sf)
+library(ggplot2)
+library(dplyr)
+
+# Load the fire incidence CSV file
+fire_data_path <- "C:/Users/SIMBAH/Desktop/Intro to Data science/Project/Fire incidences DC_VA_MD_cleaned.csv"  # Update with your actual path
+fire_data <- read.csv(fire_data_path)
+
+# Check for missing values in LONGITUDE and LATITUDE
+missing_coords <- fire_data %>%
+  filter(is.na(LONGITUDE) | is.na(LATITUDE))
+
+# Print missing coordinates
+if (nrow(missing_coords) > 0) {
+  print("Rows with missing coordinates:")
+  print(missing_coords)
+}
+
+# Remove rows with missing coordinates
+fire_data_clean <- fire_data %>%
+  filter(!is.na(LONGITUDE) & !is.na(LATITUDE))
+
+# Load the shapefile
+shapefile_path <- "C:/Users/SIMBAH/Desktop/Intro to Data science/Project/DC_MD_VA Boundaries/Project_Area.shp"  # Update this path to your shapefile
+states_shapefile <- st_read(shapefile_path)
+
+# Convert fire data to sf object (for plotting)
+fire_data_sf <- st_as_sf(fire_data_clean, coords = c("LONGITUDE", "LATITUDE"), crs = 4326)
+
+# Create a geographic map with shapefile and fire incidents
+ggplot() +
+  geom_sf(data = states_shapefile, fill = NA, color = "black") +  # Plot shapefile
+  geom_sf(data = fire_data_sf, aes(color = NWCG_GENERAL_CAUSE), alpha = 0.6, size = 2) +  # Plot fire incidents
+  scale_color_viridis_d() +  # Optional: Use a color palette for causes
+  theme_minimal() +
+  ggtitle("Geographic Distribution of Fire Incidences by cause") +
+  xlab("Longitude") +
+  ylab("Latitude")
+
+```
+
+## 3.2.11 Confidence Intervals
+
+```{r}
+
+# Load necessary libraries
+library(dplyr)
+
+# Load the fire incidence CSV file
+fire_data_path <- "C:/Users/SIMBAH/Desktop/Intro to Data science/Project/Fire incidences DC_VA_MD_cleaned.csv"  # Update with your actual path
+fire_data <- read.csv(fire_data_path)
+
+# Summarize the data to get counts of incidents by state and cause
+incident_counts <- fire_data %>%
+  group_by(STATE, NWCG_GENERAL_CAUSE) %>%
+  summarise(Incident_Count = n(), .groups = 'drop')
+
+# 1. ANOVA: Testing for differences in means across states based on cause
+anova_result <- aov(Incident_Count ~ STATE, data = incident_counts)  # Adjust column names as necessary
+anova_summary <- summary(anova_result)
+
+# Print ANOVA summary for debugging
+print(anova_summary)
+
+# Check if ANOVA summary has results
+if (length(anova_summary) > 0 && !is.null(anova_summary[[1]])) {
+  # Check if p-value is significant
+  if (anova_summary[[1]][["Pr(>F)"]][1] < 0.05) {  
+    tukey_result <- TukeyHSD(anova_result)  # Perform Tukey's HSD test for pairwise comparisons
+    print(tukey_result)
+  } else {
+    print("No significant differences found in ANOVA.")
+  }
+} else {
+  print("ANOVA did not produce valid results.")
+}
+
+# 2. t-test: Compare Virginia (VA) and Maryland (MD) means
+va_incidents <- incident_counts %>% filter(STATE == "VA")  # Using STATE for Virginia
+md_incidents <- incident_counts %>% filter(STATE == "MD")  # Using STATE for Maryland
+
+# Ensure there are enough observations
+if (nrow(va_incidents) > 0 && nrow(md_incidents) > 0) {
+  t_test_result <- t.test(va_incidents$Incident_Count, md_incidents$Incident_Count, var.equal = TRUE)  # Adjust as necessary
+  print(t_test_result)
+} else {
+  print("Not enough data for t-test.")
+}
+
+# 3. Confidence Interval for Virginia's mean
+if (nrow(va_incidents) > 0) {
+  mean_va <- mean(va_incidents$Incident_Count, na.rm = TRUE)
+  std_error_va <- sd(va_incidents$Incident_Count, na.rm = TRUE) / sqrt(nrow(va_incidents))
+
+  # 95% Confidence Interval
+  error_margin <- qt(0.975, df = nrow(va_incidents) - 1) * std_error_va
+  ci_va <- c(mean_va - error_margin, mean_va + error_margin)
+  print(paste("95% Confidence Interval for Virginia's mean:", ci_va[1], "to", ci_va[2]))
+} else {
+  print("No data available for Virginia.")
+}
+```
+
+## 3.2.12 Analysis of Variance (ANOVA)
+
+```{r}
+
+# 1. ANOVA: Testing for differences in means across states based on cause
+anova_result <- aov(Incident_Count ~ STATE, data = incident_counts)  # Adjust column names as necessary
+anova_summary <- summary(anova_result)
+
+# Print ANOVA summary for debugging
+print(anova_summary)
+
+# Check if ANOVA summary has results
+if (length(anova_summary) > 0 && !is.null(anova_summary)) {
+  # Check if p-value is significant
+  if (anova_summary[[1]][["Pr(>F)"]][1] < 0.05) {  
+    tukey_result <- TukeyHSD(anova_result)  # Perform Tukey's HSD test for pairwise comparisons
+    print(tukey_result)
+  } else {
+    print("No significant differences found in ANOVA.")
+  }
+} else {
+  print("ANOVA did not produce valid results.")
+}
+```
+
+# 3.3 Objective 3: Investigate Environmental Factors Influencing Fire Incidences
+
+## 3.3.1 Data Integration
+
+The code below is eval=FALSE since raw data(Wildfire Dataset(from Kaggle)) it's too big and can't be uploaded on Github.
+
+```{r eval=FALSE}
+# Read CSV
+clean_df = '/Users/jeongwonyoo/Documents/GitHub/introds-project1/Fire incidences DC_VA_MD_cleaned.csv' 
+raw_df = '/Users/jeongwonyoo/Documents/GitHub/introds-project1/Wildfire_Dataset.csv'
+
+library('readr')
+clean_df = read_csv(clean_df)
+raw_df = read_csv(raw_df)
+
+# Make row_df columns names same as clean_df
+names(raw_df) = toupper(names(raw_df))
+
+# Add State name on raw data
+options(tigris_use_cache = TRUE)
+
+states = tigris::states(cb = TRUE, year = 2023) %>%
+    st_transform(4326) %>%
+    select(STUSPS, NAME, geometry)
+
+sf_raw = st_as_sf(raw_df %>% filter(!is.na(LATITUDE), !is.na(LONGITUDE)),coords = c("LONGITUDE","LATITUDE"), crs = 4326, remove=FALSE)
+
+raw_with_state_poly = st_join(sf_raw, states, join = st_within) %>%
+    st_drop_geometry() %>%
+    rename(STATE = STUSPS)
+
+# sort target data(state(VA,DC,MD),time(2018))
+target_states = c("DC","MD","VA")
+target_year = 2018
+cols_keep = c("STATE","FIRE_YEAR","Month","LATITUDE","LONGITUDE",
+                   "DATETIME","PR","RMAX","RMIN","SPH","SRAD","TMMN",
+                  "TMMX","VS","BI","FM100","FM1000","ERC","ETR","PET","VPD")
+
+# Make sub dataset of clean_df
+clean_sub = clean_df %>%
+    filter(STATE %in% target_states,
+           FIRE_YEAR == target_year) %>% 
+    select(any_of(cols_keep))
+
+# Make sub dataset of raw_df
+raw_sub = raw_with_state_poly %>%
+    filter(STATE %in% target_states,
+           lubridate::year(lubridate::as_datetime(DATETIME)) == target_year) %>%
+    drop_na(LATITUDE, LONGITUDE) %>%
+    select(any_of(cols_keep))
+
+# organized data check
+str('raw_sub')
+```
+
+Call new dataset for the analysis
+```{r}
+dp = 'clean_object2_2018_DCMDVA.csv'
+object2 = read_csv(dp)
+```
+
+Here is a table description for the object3 dataset
+
+```{r var-table, message=FALSE, warning=FALSE}
+library(dplyr)
+library(knitr)
+
+vars <- tibble::tribble(
+  ~Variable,      ~Description,                                   ~Units,
+  "PR",           "Precipitation",                                 "mm/day",
+  "RMAX / RMIN",  "Relative humidity (Maximum / Minimum)",         "%", 
+  "SPH",          "Specific humidity",                             "kg/kg",
+  "SRAD",         "Solar radiation",                               "W/m²",
+  "TMMN / TMMX",  "Temperatures (Minimum / Maximum)",              "°C",
+  "VS",           "Wind speed",                                    "m/s",
+  "VPD",          "Vapor pressure deficit",                        "kPa",
+  "FM100 / FM1000","Fuel moisture indices",                        "%",
+  "ERC",          "Energy Release Component",                      "index",
+  "BI",           "Burning Index",                                 "index",
+  "ETR / PET",    "Evapotranspiration (ETR) / Potential (PET)",    "mm/day"
+)
+
+knitr::kable(
+  vars,
+  format = "html",
+  caption = "Variable definitions used in the analysis",
+  align = c("l","l","c")
+)
+```
+
+
+## 3.3.2 Correlation Analysis
+
+```{r}
+env_vars = object2 %>% select(PR, RMAX, RMIN, SPH, SRAD, TMMN, TMMX, VS, FM100, FM1000, ERC, ETR, PET, VPD)
+cor_mat = cor(env_vars, use = "complete.obs")
+corrplot(cor_mat, method = "color", tl.cex = 0.8)
+```
+
+Correlation heatmap
+
+- Analysis based on Pearson correlation among environmental variables
+- Strong correlation criterion: |r| ≥ 0.60
+- ERC vs FM100/FM1000: strong negative correlation → wetter fuels suppress fire potential
+- VPD vs TMMX/SRAD: positive correlation → hotter and sunnier conditions associated with drier air
+- Humidity variables (RMAX/RMIN/SPH): moderate negative correlations with VPD → higher humidity linked to reduced dryness
+
+## 3.3.3 Raster Maps
+
+- Raster maps visualize spatial distribution of environmental variables and their relation to fire potential
+- Each pixel represents mean value of variable within geographic grid
+
+```{r}
+library(dplyr); library(ggplot2)
+
+plot_raster <- function(df, var, bins = 60, to_celsius = FALSE) {
+    z <- if (to_celsius) df[[var]] - 273.15 else df[[var]]
+    ggplot(df, aes(LONGITUDE, LATITUDE, z = z)) +
+        stat_summary_2d(fun = mean, bins = bins, na.rm = TRUE) +
+        coord_fixed(expand = FALSE) +
+        scale_fill_viridis_c(name = var) +
+        labs(title = paste(var, "Distribution")) +
+        theme_minimal(base_size = 12)
+}
+```
+
+```{r}
+plot_raster(object2, "TMMX", bins = 70, to_celsius = TRUE)
+```
+
+TMMX(Maximum Temperatures) binned raster map
+
+- higher in central–eastern areas, lower in west, overlaps with higher VPD zones
+
+```{r}
+plot_raster(object2, "VPD",  bins = 70)
+```
+
+VPD(Vapor presure deficit) binned raster map
+
+- high-dryness pockets in warm central/eastern areas, primary dryness proxy recommended to avoid collinearity with TMMX
+
+```{r}
+plot_raster(object2, "FM100", bins = 70)
+```
+
+FM100(Fuel Moisture indices) binned raster map
+
+- wetter fuels (higher FM100) in central–north/east
+- drier (lower FM100) in west/southwest → higher fire potential where low FM100 coincides with high VPD
+
+```{r}
+plot_raster(object2, "PR",   bins = 70)
+``` 
+
+PR(precipitation) binned raster map
+
+- patchy distribution
+- higher PR corresponds to lower ERC, consistent with wetting effects
+
+```{r}
+plot_raster(object2, "VS",   bins = 70)
+```
+
+VS(Wind Speed) binned raster map
+
+- localized maxima not always aligned with high ERC zones → wind acts as short-term enhancer, not persistent driver
+
+```{r}
+plot_raster(object2, "ERC",  bins = 70)
+```
+
+ERC(Energy release component) binned raster map
+
+- elevated in warm-dry clusters
+- strong spatial alignment with high TMMX and VPD and inverse relation with FM100
+
+## 3.3.4 Scatter Plots
+
+
+```{r}
+ggplot(object2, aes(x = TMMX, y = BI)) +geom_point(alpha = 0.4)+     geom_smooth(method = "lm", se = FALSE, color = "red")+labs(title = "Fire Index vs. Temperature")
+```
+
+BI(Burning index) vs. TMMX
+
+- Scatter of BI (Burning Index) vs TMMX shows weak positive relationship
+- Distribution dominated by many zero or near-zero BI values → zero inflation and heteroscedasticity
+- Suggestion: apply multivariable model incorporating VPD, FM100, VS, and PR to capture combined effects
+- For modeling BI directly: consider subset with BI > 0 or use model suited for zero-inflated data
+
+## 3.3.5 Regression Diagnostics Plots
+
+
+```{r}
+model = lm(BI ~ TMMX + PR + VS + VPD, data = object2)
+par(mfrow = c(2, 2))
+plot(model)
+```
+
+- Residuals vs Fitted: fan-shaped and curved → heteroscedasticity and nonlinearity
+- Q–Q Plot: heavy tails → outliers and non-normal residuals
+- Scale–Location Plot: confirms nonconstant variance
+- Residuals vs Leverage: presence of high-leverage points → potential influence on coefficient stability
+
+- OLS assumptions violated → spatial or robust models recommended
+
+## 3.3.6 Spatial Regression
+
+The code chunk is taking long-running: disabled during knit (works in Console).
+Keep full code here for reproducibility and results pasted below.
+
+```{r eval=FALSE}
+o2 = object2 %>%
+  group_by(LONGITUDE, LATITUDE) %>%
+  summarise(across(c(PR, RMAX, RMIN, SPH, SRAD, TMMN, TMMX, VS,
+                     FM100, FM1000, ERC, ETR, PET, VPD),
+                   ~mean(.x, na.rm = TRUE)), .groups = "drop") %>%
+  mutate(id = row_number())
+
+vars = c("ERC","TMMX","VPD","FM100","PR","VS","RMAX","SRAD")
+
+keep_logical = complete.cases(o2[, vars])
+
+dat = o2[keep_logical, c(vars, "id"), drop = FALSE]
+stopifnot(nrow(dat) > 1)
+
+coords = as.matrix(o2[, c("LONGITUDE","LATITUDE")])
+coords_k = coords[dat$id, , drop = FALSE]
+stopifnot(nrow(coords_k) == nrow(dat))
+
+k = 8
+repeat {
+  nb = knn2nb(knearneigh(coords_k, k = k, longlat = TRUE))
+  if (n.comp.nb(nb)$nc == 1 || k >= 20) break
+  k = k + 2
+}
+
+lw_k = nb2listw(nb, style = "W", zero.policy = FALSE)
+
+xvars = c("TMMX","VPD","FM100","PR","VS","RMAX","SRAD")
+dat_std = dat
+dat_std[xvars] = scale(dat_std[xvars])
+
+ols = lm(ERC ~ TMMX + VPD + FM100 + PR + VS + RMAX + SRAD, data = dat_std)
+sem = errorsarlm(ERC ~ TMMX + VPD + FM100 + PR + VS + RMAX + SRAD,
+                  data = dat_std, listw = lw_k, na.action = na.exclude)
+
+summary(ols)
+summary(sem)
+moran.test(residuals(ols), lw_k)
+moran.test(residuals(sem), lw_k)
+```
+
+# 3.3.7 Description of Results
+
+- summary(ols)
+
+Call:
+lm(formula = ERC ~ TMMX + VPD + FM100 + PR + VS + RMAX + SRAD, 
+    data = dat_std)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-4.7305 -1.2031  0.2945  1.4940  3.0632 
+
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  19.0706     0.2347  81.252  < 2e-16 ***
+TMMX         -1.5034     1.3189  -1.140 0.258491    
+VPD           1.0727     1.2690   0.845 0.401050    
+FM100        -4.8261     1.1851  -4.072 0.000129 ***
+PR           -1.0014     0.3540  -2.829 0.006203 ** 
+VS           -0.2254     0.3353  -0.672 0.503884    
+RMAX          0.1135     0.8120   0.140 0.889270    
+SRAD          0.2321     0.7866   0.295 0.768867    
+---
+Signif. codes:  0 ‘’ 0.001 ‘’ 0.01 ‘’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 2.005 on 65 degrees of freedom
+Multiple R-squared:  0.9028,	Adjusted R-squared:  0.8924 
+F-statistic: 86.28 on 7 and 65 DF,  p-value: < 2.2e-16
+
+- summary(sem)
+
+Call:errorsarlm(formula = ERC ~ TMMX + VPD + FM100 + PR + VS + RMAX + 
+    SRAD, data = dat_std, listw = lw_k, na.action = na.exclude)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-4.00770 -1.09347  0.12968  1.09124  2.98286 
+
+Type: error 
+Coefficients: (asymptotic standard errors) 
+            Estimate Std. Error z value  Pr(>|z|)
+(Intercept) 19.12921    0.60304 31.7211 < 2.2e-16
+TMMX        -2.10797    0.88425 -2.3839   0.01713
+VPD          2.08839    0.91643  2.2788   0.02268
+FM100       -4.32810    0.81694 -5.2979 1.171e-07
+PR          -0.56119    0.24728 -2.2694   0.02324
+VS          -0.23018    0.26144 -0.8804   0.37863
+RMAX        -0.50397    0.56725 -0.8884   0.37430
+SRAD        -0.11324    0.57086 -0.1984   0.84277
+
+Lambda: 0.72518, LR test value: 36.149, p-value: 1.8279e-09
+Asymptotic standard error: 0.082947
+    z-value: 8.7427, p-value: < 2.22e-16
+Wald statistic: 76.435, p-value: < 2.22e-16
+
+Log likelihood: -132.0661 for error model
+ML residual variance (sigma squared): 1.9885, (sigma: 1.4101)
+Number of observations: 73 
+Number of parameters estimated: 10 
+AIC: 284.13, (AIC for lm: 318.28)
+
+- moran.test(residuals(ols), lw_k)
+
+	Moran I test under randomisation
+
+data:  residuals(ols)  
+weights: lw_k    
+
+Moran I statistic standard deviate = 9.0678, p-value < 2.2e-16
+alternative hypothesis: greater
+sample estimates:
+Moran I statistic       Expectation          Variance 
+      0.450965435      -0.013888889       0.002628031 
+
+- moran.test(residuals(sem), lw_k)
+
+	Moran I test under randomisation
+
+data:  residuals(sem)  
+weights: lw_k    
+
+Moran I statistic standard deviate = -0.12209, p-value = 0.5486
+alternative hypothesis: greater
+sample estimates:
+Moran I statistic       Expectation          Variance 
+     -0.020133928      -0.013888889       0.002616504 
+
+### 3.3.8 Result Description
+
+- OLS Model: significant negative effects from FM100 and PR; other predictors less significant,  residual diagnostics indicate heteroscedasticity and spatial clustering
+
+- SEM Model: improved fit (AIC 284.13 vs 318.28); strong spatial dependence (λ = 0.725, p < 0.001)
+
+- Model comparison: SEM preferred → captures spatial error structure and improves fit
+Dryness and moisture as key drivers: high VPD and low FM100 elevate fire potential, precipitation reduces it
+- Temperature vs VPD: VPD better represents combined heat-dryness effect; reduces multicollinearity and sign reversal
+- Residual patterns: SEM removes spatial clustering and produces stable estimates
+- Overall finding: spatial error modeling confirms that dry atmosphere, low fuel moisture, and limited rainfall are dominant environmental controls on fire energy release in DC–MD–VA regions.
+
+##  Chapter 4: Conclusion and Recommendations
+
+## 4.1 Conclusion
+
+Final Integrated Conclusion
+
+1. Comprehensive Relationship between Fire Incidents and Environmental Factors
+
+Fire occurrences across Washington, D.C., Maryland, and Virginia in 2018 were not random events but rather the outcome of interacting geographic, climatic, and anthropogenic factors. Among all variables, Vapor Pressure Deficit (VPD), Fuel Moisture (FM100), and Precipitation (PR) emerged as the most critical predictors of fire potential. Drier air (higher VPD), lower fuel moisture, and limited rainfall jointly amplified the Energy Release Component (ERC), indicating greater fire intensity and risk.Conversely, high fuel moisture and increased precipitation significantly mitigated fire potential, confirming that dryness and wetness dynamics are the dominant controls on regional fire patterns.
+
+2. Spatial Dependence and Model Performance
+   The Spatial Error Model (SEM) substantially outperformed the Ordinary Least Squares (OLS) model (AIC = 284.13 vs 318.28), capturing spatial autocorrelation that OLS failed to explain.
+   The strong spatial error coefficient (λ = 0.725, p < 0.001) and Moran’s I reduction from 0.451 to –0.020 confirmed that the SEM successfully eliminated residual spatial clustering.
+   Therefore, SEM provides more reliable and interpretable coefficients for spatially dependent fire data and should be prioritized for regional fire modeling.
+
+3. Regional and Temporal Patterns
+Hot spot analysis revealed that fire incidents were concentrated in central and eastern parts of Maryland and Virginia, while western areas were relatively moist and less prone to fire. Temporal heat maps suggested a clear seasonal peak during the summer months, when temperature, dryness, and solar radiation interact to reduce fuel moisture. Moreover, the cause-based analysis showed that urban areas experienced more human-related fires (residential, electrical, vehicular), whereas rural zones exhibited more natural or vegetation-driven fires, emphasizing the need for region-specific prevention strategies.
+
+4. Policy and Management Implications
+
+- Short-term monitoring: Continuously track real-time VPD, FM100, and PR to update regional fire alerts and optimize emergency resource deployment.
+
+- Long-term mitigation: Focus fuel management and firebreak construction in the identified central–eastern hotspots.
+
+- Urban strategy: Strengthen inspections of electrical systems and residential safety. Rural strategy: Emphasize vegetation control and fuel reduction under persistent dryness. Overall, a data-driven, spatially adaptive fire prevention framework is essential for effective mitigation.
+
+Across figures, hotter and drier conditions (higher TMMX and VPD) spatially coincide with higher ERC, while higher fuel moisture (FM100 and FM1000) opposes ERC. Precipitation and humidity indicators also oppose ERC but with patchier spatial expression. Wind shows localized peaks and likely modulates spread rather than setting the background hazard. These visual patterns match the correlation matrix and justify focusing the spatial regression on TMMX, VPD, and one fuel-moisture variable (FM100) while avoiding FM100 and FM1000 together due to collinearity.
+
+# 4.2 Recommendations
+
+Implement real time monitoring of dryness and moisture indicators to improve early detection. Prioritize targeted hotspot management in areas with elevated fire potential. Develop region specific prevention plans that reflect local environmental characteristics and historical fire behavior.
+
+# REFERENCES
+
+Fire Loss in the United States 2020
+
+National Emergency Response Information System (NERIS) 2019
+
+National Fire Incident Reporting System (NFIRS) 2018
+
+National Fire Protection Association (NFPA) 2019
+
+National Inter-agency Fire Center (NIFC) 2020
+
+U.S. Fire Administration (USFA) 2018
+
+USFA Topical Fire Reports 2018
+
+NFPA Survey Estimates 2019
+
