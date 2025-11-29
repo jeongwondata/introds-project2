@@ -13,3 +13,114 @@ knitr::opts_chunk$set(echo = TRUE)
 This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(ezids)
+library(ggplot2)
+library(treemapify)
+library(dplyr)
+library(gridExtra)
+
+fire <- read.csv("Fire incidences DC_VA_MD_cleands.csv")
+
+str(fire)
+head(fire)
+
+xkablesummary(fire, title = "Fire Statistics Summary")
+
+table(fire$NWCG_CAUSE_CLASSIFICATION)
+
+ggplot(fire, aes(x = NWCG_CAUSE_CLASSIFICATION)) +
+  geom_bar(col = "black", fill = "white", alpha = 0.7) +
+  labs(title = "Fire Cause Classification",
+       x = "Cause Classification",
+       y = "Number of Incidents")
+
+general_cause_counts <- table(fire$NWCG_GENERAL_CAUSE)
+general_cause_counts <- sort(general_cause_counts, decreasing = TRUE)
+general_cause_counts
+
+fire_cause_summary <- as.data.frame(table(fire$NWCG_GENERAL_CAUSE))
+colnames(fire_cause_summary) <- c("Cause", "Count")
+
+ggplot(fire_cause_summary,
+       aes(area = Count, fill = Cause, label = paste(Cause, "\n", Count))) +
+  geom_treemap() +
+  geom_treemap_text(colour = "white", place = "centre", grow = TRUE) +
+  labs(title = "Fire Incident Causes",
+       subtitle = "Proportion of Each General Cause across All Regions") +
+  theme(legend.position = "none")
+
+state_counts <- table(fire$STATE)
+state_counts
+
+barplot(state_counts,
+        main = "Fire Incidents by State",
+        xlab = "State",
+        ylab = "Number of Incidents",
+        col = "red")
+
+state_stats <- data.frame(
+  STATE = c("DC", "MD", "VA"),
+  AREA_SQ_MI = c(68, 12407, 42775),
+  POP_2018 = c(702455, 6035802, 8517685)
+)
+
+state_counts_df <- as.data.frame(table(fire$STATE))
+colnames(state_counts_df) <- c("STATE", "FIRE_COUNT")
+
+state_summary <- merge(state_counts_df, state_stats, by = "STATE")
+
+state_summary$FIRE_PER_100K <- (state_summary$FIRE_COUNT / state_summary$POP_2018) * 100000
+state_summary$FIRE_PER_SQMI <- state_summary$FIRE_COUNT / state_summary$AREA_SQ_MI
+
+state_summary
+
+ggplot(state_summary, aes(x = STATE, y = FIRE_PER_100K, fill = STATE)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Fire Incidents per 100,000 Population (2018)",
+       y = "Incidents per 100,000 people") +
+  theme_minimal(base_size = 14)
+
+ggplot(state_summary, aes(x = STATE, y = FIRE_PER_SQMI, fill = STATE)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Fire Density per Square Mile (2018)",
+       y = "Incidents per sq. mile") +
+  theme_minimal(base_size = 14)
+
+urban_counties <- c("Washington, D.C.",
+                    "Montgomery County", "Prince George's County", "Baltimore City",
+                    "Anne Arundel County", "Howard County",
+                    "Fairfax County", "Arlington County", "Virginia Beach City",
+                    "Chesterfield County", "Henrico County", "Loudoun County")
+
+rural_counties <- c("Garrett County", "Allegany County", "Washington County",
+                    "Caroline County", "Somerset County", "Dorchester County",
+                    "Bath County", "Highland County", "Scott County",
+                    "Lee County", "Tazewell County", "Wise County")
+
+fire$AREA_TYPE <- ifelse(fire$FIPS_NAME %in% urban_counties, "Urban", "Rural")
+
+table(fire$AREA_TYPE)
+
+ggplot(fire, aes(x = AREA_TYPE, y = FIRE_SIZE, fill = AREA_TYPE)) +
+  geom_boxplot(alpha = 0.7, color = "black") +
+  labs(title = "Fire Size Distribution by Area Type",
+       x = "Area Type", y = "Fire Size") +
+  theme_minimal(base_size = 12)
+
+table(fire$AREA_TYPE, fire$NWCG_GENERAL_CAUSE)
+
+ggplot(data = fire, aes(x = NWCG_GENERAL_CAUSE, fill = AREA_TYPE)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of Fire Causes by Area Type",
+       x = "General Cause", y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+chisq.test(table(fire$AREA_TYPE, fire$NWCG_GENERAL_CAUSE))
+
+qqnorm(fire$FIRE_SIZE)
+qqline(fire$FIRE_SIZE)
+
+
+```
