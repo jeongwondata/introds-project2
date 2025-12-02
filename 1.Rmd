@@ -6,6 +6,7 @@ date: "2025-11-16"
 ---
 
 ```{r setup, include=FALSE}
+library(readr)
 library(dplyr)
 library(tidymodels)
 knitr::opts_chunk$set(echo = TRUE)
@@ -13,37 +14,20 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 # data
-path = '/Users/jeongwonyoo/Documents/GitHub/introds-project2/Fire incidences DC_VA_MD_cleaned.csv'
+path = '/Users/jeongwonyoo/Documents/GitHub/introds-project2/Fire incidences DC_VA_MD_cleands.csv'
 data = read.csv(path)
 ```
 
-# Data Clean
-
-Delete values outside of Human and Natural in NWCG_CAUSE_CLASSIFICATION columns
-(71 objects)
+# Data Explore
 
 ```{r}
-data_clean <- data %>% 
-  filter(!is.na(NWCG_CAUSE_CLASSIFICATION),NWCG_CAUSE_CLASSIFICATION %in% c("Human", "Natural"))
-```
-
-# Data split
-
-```{r}
-set.seed(43)
-
-data_split <- initial_split(
-    data_clean,
-    prop = 0.7,
-    strata = NWCG_CAUSE_CLASSIFICATION
-)
-
-train_data <- training(data_split)
-test_data  <- testing(data_split)
+str(data)
 ```
 
 ```{r}
-data_clean$NWCG_CAUSE_CLASSIFICATION <- factor(
-  data_clean$NWCG_CAUSE_CLASSIFICATION,
+data$NWCG_CAUSE_CLASSIFICATION = factor(
+  data$NWCG_CAUSE_CLASSIFICATION,
   levels = c("Natural", "Human"))
 ```
+
+# logistic Regression
