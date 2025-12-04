@@ -21,7 +21,7 @@ library(treemapify)
 library(dplyr)
 library(gridExtra)
 
-fire <- read.csv("Fire incidences DC_VA_MD_cleands.csv")
+fire <- read.csv("data_2018_clean.csv")
 
 str(fire)
 head(fire)
@@ -121,6 +121,104 @@ chisq.test(table(fire$AREA_TYPE, fire$NWCG_GENERAL_CAUSE))
 
 qqnorm(fire$FIRE_SIZE)
 qqline(fire$FIRE_SIZE)
+
+
+```
+```{r}
+data_clean <- na.omit(fire)
+colSums(is.na(data_clean))
+
+
+```
+
+random forest
+
+```{r}
+library(randomForest)
+set.seed(123)
+
+
+
+# Convert response to factor
+data_clean$NWCG_CAUSE_CLASSIFICATION <- as.factor(data_clean$NWCG_CAUSE_CLASSIFICATION)
+
+# Convert any character predictors to factors
+data_clean[sapply(data_clean, is.character)] <- 
+  lapply(data_clean[sapply(data_clean, is.character)], factor)
+
+
+index <- sample(seq_len(nrow(data_clean)), size = 0.7 * nrow(data_clean))
+train <- data_clean[index, ]
+test  <- data_clean[-index, ]
+
+
+
+rf_model <- randomForest(
+  NWCG_CAUSE_CLASSIFICATION ~ FIRE_SIZE + CONT_TIME + LATITUDE + LONGITUDE +
+    Month + FIRE_SIZE_CLASS + STATE,
+  data = train,
+  ntree = 500,
+  importance = TRUE,
+  na.action = na.omit
+)
+
+
+
+rf_pred <- predict(rf_model, test)
+
+
+# Confusion Matrix
+
+
+cm <- table(Predicted = rf_pred, Actual = test$NWCG_CAUSE_CLASSIFICATION)
+cm
+
+
+# Accuracy
+
+
+rf_accuracy <- sum(diag(cm)) / sum(cm)
+rf_accuracy
+
+
+```
+
+ svm
+```{r}
+library(kernlab)
+
+set.seed(123)
+
+# 1. Train-test split
+index <- sample(1:nrow(data_clean), 0.7 * nrow(data_clean))
+train <- data_clean[index, ]
+test  <- data_clean[-index, ]
+
+# Make sure target is factor
+train$NWCG_CAUSE_CLASSIFICATION <- as.factor(train$NWCG_CAUSE_CLASSIFICATION)
+test$NWCG_CAUSE_CLASSIFICATION  <- as.factor(test$NWCG_CAUSE_CLASSIFICATION)
+
+# 2. SVM model (RBF kernel)
+svm_model <- ksvm(
+  NWCG_CAUSE_CLASSIFICATION ~ FIRE_SIZE + CONT_TIME + LATITUDE + LONGITUDE +
+    Month + FIRE_SIZE_CLASS + STATE,
+  data = train,
+  kernel = "rbfdot",
+  scaled = TRUE,
+  prob.model = TRUE
+)
+
+# 3. Predictions
+svm_pred <- predict(svm_model, test)
+
+# 4. Confusion matrix
+table(Predicted = svm_pred, Actual = test$NWCG_CAUSE_CLASSIFICATION)
+
+# 5. Accuracy
+cm <- table(svm_pred, test$NWCG_CAUSE_CLASSIFICATION)
+svm_accuracy <- sum(diag(cm)) / sum(cm)
+svm_accuracy
+
 
 
 ```
