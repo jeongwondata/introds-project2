@@ -125,98 +125,105 @@ qqline(fire$FIRE_SIZE)
 
 ```
 ```{r}
-data_clean <- na.omit(fire)
-colSums(is.na(data_clean))
+
+data_clean <- read.csv("Fire_Incidence_Data 2018-2019.csv")
+
+# 1. Clean target variable BEFORE splitting
+data_clean$Wildfire <- trimws(data_clean$Wildfire)
+data_clean$Wildfire <- factor(data_clean$Wildfire, levels = c("No","Yes"))
+
+table(data_clean$Wildfire)
+
+# 2. Split into train (2018) and test (2019)
+train2018 <- subset(data_clean, Year == 2018)
+test2019  <- subset(data_clean, Year == 2019)
+
+data_clean$Wildfire <- factor(data_clean$Wildfire, levels = c("No", "Yes"))
+str(data_clean$Wildfire)
+table(data_clean$Wildfire)
+
+nrow(train2018)
+nrow(test2019)
+
+print(colnames(data_clean))
+table(data_clean$Wildfire, useNA = "ifany")
+
+```
+```{r}
+library(corrplot)
+library(e1071)
+library(randomForest)
+
+num_vars <- train2018[, c("pr","rmax","rmin","sph","srad",
+                          "tmmn","tmmx","vs","bi",
+                          "fm100","fm1000","erc","etr","pet","vpd")]
+
+corr_mat <- cor(num_vars, method = "pearson")
+
+corrplot(corr_mat, method="number", type="upper",
+         tl.col="black", title="Correlations (Climate Variables)")
 
 
 ```
 
+
 random forest
 
 ```{r}
-library(randomForest)
-set.seed(123)
-
-
-
-# Convert response to factor
-data_clean$NWCG_CAUSE_CLASSIFICATION <- as.factor(data_clean$NWCG_CAUSE_CLASSIFICATION)
-
-# Convert any character predictors to factors
-data_clean[sapply(data_clean, is.character)] <- 
-  lapply(data_clean[sapply(data_clean, is.character)], factor)
-
-
-index <- sample(seq_len(nrow(data_clean)), size = 0.7 * nrow(data_clean))
-train <- data_clean[index, ]
-test  <- data_clean[-index, ]
-
 
 
 rf_model <- randomForest(
-  NWCG_CAUSE_CLASSIFICATION ~ FIRE_SIZE + CONT_TIME + LATITUDE + LONGITUDE +
-    Month + FIRE_SIZE_CLASS + STATE,
-  data = train,
+  Wildfire ~ latitude + longitude + pr + rmax + rmin + sph + srad +
+    tmmn + tmmx + vs + bi + fm100 + fm1000 + erc + etr + pet + vpd,
+  data = train2018,
   ntree = 500,
   importance = TRUE,
-  na.action = na.omit
+  classwt = c("No" = 1, "Yes" = 2500) 
 )
 
+# 4. Predictions
+rf_pred <- predict(rf_model, test2019)
 
-
-rf_pred <- predict(rf_model, test)
-
-
-# Confusion Matrix
-
-
-cm <- table(Predicted = rf_pred, Actual = test$NWCG_CAUSE_CLASSIFICATION)
+# 5. Confusion Matrix
+cm <- table(Predicted = rf_pred, Actual = test2019$Wildfire)
 cm
 
+# 6. Accuracy
 
-# Accuracy
-
-
-rf_accuracy <- sum(diag(cm)) / sum(cm)
-rf_accuracy
-
+accuracy <- sum(diag(cm)) / sum(cm)
+accuracy
 
 ```
 
  svm
 ```{r}
-library(kernlab)
 
-set.seed(123)
 
-# 1. Train-test split
-index <- sample(1:nrow(data_clean), 0.7 * nrow(data_clean))
-train <- data_clean[index, ]
-test  <- data_clean[-index, ]
 
-# Make sure target is factor
-train$NWCG_CAUSE_CLASSIFICATION <- as.factor(train$NWCG_CAUSE_CLASSIFICATION)
-test$NWCG_CAUSE_CLASSIFICATION  <- as.factor(test$NWCG_CAUSE_CLASSIFICATION)
 
-# 2. SVM model (RBF kernel)
-svm_model <- ksvm(
-  NWCG_CAUSE_CLASSIFICATION ~ FIRE_SIZE + CONT_TIME + LATITUDE + LONGITUDE +
-    Month + FIRE_SIZE_CLASS + STATE,
-  data = train,
-  kernel = "rbfdot",
-  scaled = TRUE,
-  prob.model = TRUE
+data_clean$Wildfire <- trimws(data_clean$Wildfire)
+data_clean$Wildfire <- factor(data_clean$Wildfire, levels = c("No","Yes"))
+
+train2018 <- subset(data_clean, Year == 2018)
+test2019  <- subset(data_clean, Year == 2019)
+
+svm_model <- svm(
+  Wildfire ~ latitude + longitude + pr + rmax + rmin + sph + srad +
+    tmmn + tmmx + vs + bi + fm100 + fm1000 + erc + etr + pet + vpd,
+  data = train2018,
+  kernel = "radial",
+  probability = TRUE
 )
 
-# 3. Predictions
-svm_pred <- predict(svm_model, test)
+# 4. Predictions
+svm_pred <- predict(svm_model, test2019)
 
-# 4. Confusion matrix
-table(Predicted = svm_pred, Actual = test$NWCG_CAUSE_CLASSIFICATION)
+# 5. Confusion matrix
+svm_cm <- table(Predicted = svm_pred, Actual = test2019$Wildfire)
+svm_cm
 
-# 5. Accuracy
-cm <- table(svm_pred, test$NWCG_CAUSE_CLASSIFICATION)
-svm_accuracy <- sum(diag(cm)) / sum(cm)
+# 6. Accuracy
+svm_accuracy <- sum(diag(svm_cm)) / sum(svm_cm)
 svm_accuracy
 
 
