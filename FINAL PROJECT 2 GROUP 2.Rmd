@@ -198,6 +198,4 @@ autoplot(roc_obj) +
 ```
 
 
-
-uhjknbb
 __end__
