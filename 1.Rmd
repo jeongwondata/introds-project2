@@ -159,3 +159,45 @@ precision = TP / (TP + FP)
 recall= TP / (TP + FN)
 
 ```
+
+smote data has high risk of noise
+Pruning tree
+```{r}
+printcp(tree_smote)
+
+best_cp <- tree_smote$cptable[which.min(tree_smote$cptable[, "xerror"]), "CP"]
+
+best_cp
+
+tree_pruned <- prune(tree_smote, cp = best_cp)
+
+rpart.plot(tree_pruned,type = 1,extra = 1,cex = 0.4,faclen = 3)
+
+test_2019$tree_pred_pruned <- predict(
+  tree_pruned,
+  newdata = test_2019,
+  type = "class"
+)
+
+cm_pruned <- table(
+  Predicted = test_2019$tree_pred_pruned,
+  Actual    = test_2019$Wildfire
+)
+cm_pruned
+
+TP <- cm_pruned["Yes", "Yes"]
+FP <- cm_pruned["Yes", "No"]
+FN <- cm_pruned["No",  "Yes"]
+TN <- cm_pruned["No",  "No"]
+
+accuracy_pruned  <- (TP + TN) / sum(cm_pruned)
+precision_pruned <- TP / (TP + FP)
+recall_pruned    <- TP / (TP + FN)
+
+accuracy_pruned
+precision_pruned
+recall_pruned
+```
+
+The pruned decision tree produced the same evaluation metrics as the original SMOTE-trained tree. After pruning, the model has an accuracy of about 77 percent, precision around 5 percent, and recall around 29.5 percent for the “Yes” class. This means pruning simplified the tree structure but did not meaningfully change how the model classifies wildfire events.
+The recall is still much higher than the original (non-SMOTE) model, but the false positive count remains large, which keeps the precision low. Overall, SMOTE improved the model’s ability to detect rare “Yes” cases, and pruning helped reduce model complexity without affecting performance.
