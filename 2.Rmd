@@ -153,7 +153,7 @@ imp_df <- data.frame(
 # Plot all 20 features (no top_n needed)
 imp_df %>%
   ggplot(aes(x = reorder(Feature, Importance), y = Importance)) +
-  geom_col(fill = "steelblue") +
+  geom_col(fill = "lightblue") +
   coord_flip() +
   labs(
     title = "Feature Importance for Wildfire Prediction",
@@ -199,6 +199,40 @@ svm_cm
 svm_accuracy <- sum(diag(svm_cm)) / sum(svm_cm)
 svm_accuracy
 
+# Precision, Recall, F1
+TP <- svm_cm["Yes", "Yes"]
+FN <- svm_cm["No", "Yes"]
+FP <- svm_cm["Yes", "No"]
+
+svm_precision <- TP / (TP + FP)
+svm_recall    <- TP / (TP + FN)
+svm_f1        <- 2 * (svm_precision * svm_recall) / (svm_precision + svm_recall)
+
+c(
+  precision = svm_precision,
+  recall    = svm_recall,
+  F1        = svm_f1
+)
+
+# ---- ROC & AUC ----
+
+# Probability predictions
+svm_prob <- attr(
+  predict(svm_model, test2019, probability = TRUE),
+  "probabilities"
+)[, "Yes"]
+
+# ROCR performance objects
+pred_svm <- prediction(svm_prob, test2019$Wildfire)
+perf_svm <- performance(pred_svm, "tpr", "fpr")
+
+# Plot ROC curve
+plot(perf_svm, col = "red", lwd = 2, main = "SVM ROC Curve")
+abline(0, 1, lty = 2, col = "gray")
+
+# AUC
+svm_auc <- performance(pred_svm, "auc")@y.values[[1]]
+svm_auc
 
 
 ```
