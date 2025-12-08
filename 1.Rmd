@@ -123,6 +123,7 @@ TN = cm_tree["No",  "No"]
 accuracy  = (TP + TN) / sum(cm_tree)
 precision = TP / (TP + FP)
 recall= TP / (TP + FN)
+f1 <- 2 * precision * recall / (precision + recall)
 View(tree_prob)
 ```
 
@@ -149,14 +150,20 @@ cm_smote = table(Predicted = test_2019$tree_pred_smote,
                  Actual= test_2019$Wildfire)
 cm_smote
 
-TP = cm_smote["Yes", "Yes"]
-FP = cm_smote["Yes", "No"]
-FN = cm_smote["No",  "Yes"]
-TN = cm_smote["No",  "No"]
+TP_s = cm_smote["Yes", "Yes"]
+FP_s = cm_smote["Yes", "No"]
+FN_s = cm_smote["No",  "Yes"]
+TN_s = cm_smote["No",  "No"]
 
-accuracy  = (TP + TN) / sum(cm_smote)
-precision = TP / (TP + FP)
-recall= TP / (TP + FN)
+accuracy_s  = (TP_s + TN_s) / sum(cm_smote)
+precision_s = TP_s / (TP_s + FP_s)
+recall_s= TP_s / (TP_s + FN_s)
+f1_s <- 2 * precision_s * recall_s / (precision_s + recall_s)
+
+accuracy_s
+precision_s
+recall_s
+f1_s
 
 ```
 
@@ -185,19 +192,83 @@ cm_pruned <- table(
 )
 cm_pruned
 
-TP <- cm_pruned["Yes", "Yes"]
-FP <- cm_pruned["Yes", "No"]
-FN <- cm_pruned["No",  "Yes"]
-TN <- cm_pruned["No",  "No"]
+TP_p <- cm_pruned["Yes", "Yes"]
+FP_p <- cm_pruned["Yes", "No"]
+FN_p <- cm_pruned["No",  "Yes"]
+TN_p <- cm_pruned["No",  "No"]
 
-accuracy_pruned  <- (TP + TN) / sum(cm_pruned)
-precision_pruned <- TP / (TP + FP)
-recall_pruned    <- TP / (TP + FN)
+accuracy_p  <- (TP + TN) / sum(cm_pruned)
+precision_p <- TP / (TP + FP)
+recall_p    <- TP / (TP + FN)
+f1_p <- 2 * precision_p * recall_p / (precision_p + recall_p)
 
-accuracy_pruned
-precision_pruned
-recall_pruned
+accuracy_p
+precision_p
+recall_p
+f1_p
 ```
 
 The pruned decision tree produced the same evaluation metrics as the original SMOTE-trained tree. After pruning, the model has an accuracy of about 77 percent, precision around 5 percent, and recall around 29.5 percent for the “Yes” class. This means pruning simplified the tree structure but did not meaningfully change how the model classifies wildfire events.
 The recall is still much higher than the original (non-SMOTE) model, but the false positive count remains large, which keeps the precision low. Overall, SMOTE improved the model’s ability to detect rare “Yes” cases, and pruning helped reduce model complexity without affecting performance.
+
+# logistic regression with SMOTE
+```{r}
+logit_smote_model <- glm(
+  Wildfire ~ .,
+  data   = train_smote,
+  family = binomial
+)
+
+summary(logit_smote_model)
+
+test_2019$prob_yes_smote <- predict(
+  logit_smote_model,
+  newdata = test_2019,
+  type   = "response"
+)
+
+eval_cutoff <- function(prob, actual, cutoff) {
+  pred <- ifelse(prob >= cutoff, "Yes", "No")
+  pred <- factor(pred, levels = c("No", "Yes"))
+  
+  cm <- table(Predicted = pred, Actual = actual)
+  print(cm)
+  
+  TP_l <- cm["Yes", "Yes"]
+  FP_l <- cm["Yes", "No"]
+  FN_l <- cm["No",  "Yes"]
+  TN_l <- cm["No",  "No"]
+  
+  accuracy_l  <- (TP_l + TN_l) / sum(cm)
+  precision_l <- TP_l / (TP_l + FP_l)
+  recall_l    <- TP_l / (TP_l + FN_l)
+  f1_l        <- 2 * precision_l * recall_l / (precision_l + recall_l)
+  
+  out <- c(
+    cutoff    = cutoff,
+    accuracy  = accuracy_l,
+    precision = precision_l,
+    recall    = recall_l,
+    f1        = f1_l
+  )
+  
+  return(out)
+}
+
+cutoffs <- c(0.1, 0.2, 0.3, 0.5)
+
+results_logit_smote <- t(
+  sapply(cutoffs, function(c) {
+    eval_cutoff(
+      prob   = test_2019$prob_yes_smote,
+      actual = test_2019$Wildfire,
+      cutoff = c
+    )
+  })
+)
+
+results_logit_smote <- as.data.frame(results_logit_smote)
+results_logit_smote[] <- lapply(results_logit_smote, as.numeric)
+
+knitr::kable(results_logit_smote, digits = 4)
+```
