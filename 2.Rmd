@@ -70,24 +70,51 @@ corrplot(corr_mat, method = "number", type="upper",
 
 
 ```
+
+
+
+smote
 ```{r}
+# Install if missing
+library(smotefamily)
+library(dplyr)
 
-yes_cases <- train2018 %>% filter(Wildfire == "Yes")
-no_cases  <- train2018 %>% filter(Wildfire == "No")
+# Remove Year
+train2018$Year <- NULL
 
+# Convert target to numeric for smotefamily SMOTE
+# No = 0, Yes = 1
+train2018$Wildfire_num <- ifelse(train2018$Wildfire == "Yes", 1, 0)
+
+# Prepare x and y
+x <- train2018 %>% select(-Wildfire, -Wildfire_num)
+y <- train2018$Wildfire_num
+
+# Apply SMOTE
 set.seed(123)
-upsampled_yes <- yes_cases %>% sample_n(nrow(no_cases), replace = TRUE)
+smote_out <- SMOTE(x, y, K = 5)
 
-train_balanced <- bind_rows(no_cases, upsampled_yes)
+# Convert back to dataframe
+train_balanced <- smote_out$data
 
-table(train2018$Wildfire)
-table(train_balanced$Wildfire)   # now balanced
+# Rename target
+colnames(train_balanced)[ncol(train_balanced)] <- "Wildfire_num"
 
+# Convert numeric target back to factor Yes/No
+train_balanced$Wildfire <- factor(
+    ifelse(train_balanced$Wildfire_num == 1, "Yes", "No"),
+    levels = c("No", "Yes")
+)
+
+# Remove the numeric column
+train_balanced$Wildfire_num <- NULL
+
+# Check class balance
+table(train_balanced$Wildfire)
 
 
 
 ```
-
 random forest
 
 ```{r}
@@ -227,9 +254,9 @@ imp_df %>%
 ```{r}
 
 
-train2018$Year <- NULL
-test2019$Year <- NULL
-
+# ---------------------------
+# SVM (NO SMOTE)
+# ---------------------------
 
 svm_model <- svm(
   Wildfire ~ .,
@@ -240,52 +267,43 @@ svm_model <- svm(
   class.weights = c("No" = 1, "Yes" = 50)
 )
 
-
-# 4. Predictions
+# Predictions
 svm_pred <- predict(svm_model, test2019)
 
-# 5. Confusion matrix
 svm_cm <- table(Predicted = svm_pred, Actual = test2019$Wildfire)
 svm_cm
 
-# 6. Accuracy
+# Metrics
+TP <- svm_cm["Yes","Yes"]
+FN <- svm_cm["No","Yes"]
+FP <- svm_cm["Yes","No"]
+
 svm_accuracy <- sum(diag(svm_cm)) / sum(svm_cm)
-svm_accuracy
-
-# Precision, Recall, F1
-TP <- svm_cm["Yes", "Yes"]
-FN <- svm_cm["No", "Yes"]
-FP <- svm_cm["Yes", "No"]
-
 svm_precision <- TP / (TP + FP)
 svm_recall    <- TP / (TP + FN)
-svm_f1        <- 2 * (svm_precision * svm_recall) / (svm_precision + svm_recall)
+svm_f1        <- 2 * (svm_precision * svm_recall) /
+                 (svm_precision + svm_recall)
 
-c(
+c(accuracy = svm_accuracy,
   precision = svm_precision,
   recall    = svm_recall,
-  F1        = svm_f1
-)
+  F1        = svm_f1)
 
-# ---- ROC & AUC ----
-
-# Probability predictions
+# ROC + AUC
 svm_prob <- attr(
   predict(svm_model, test2019, probability = TRUE),
   "probabilities"
 )[, "Yes"]
 
-# ROCR performance objects
-pred_svm <- prediction(svm_prob, test2019$Wildfire)
+pred_svm <- prediction(svm_prob, test2019$Wildfire_num)
 perf_svm <- performance(pred_svm, "tpr", "fpr")
 
-# Plot ROC curve
-plot(perf_svm, col = "red", lwd = 2, main = "SVM ROC Curve")
-abline(0, 1, lty = 2, col = "gray")
+plot(perf_svm, col="red", lwd=2, main="SVM ROC Curve")
+abline(0,1,lty=2)
 
-# AUC
 svm_auc <- performance(pred_svm, "auc")@y.values[[1]]
 svm_auc
+
 
 
 ```
