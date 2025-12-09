@@ -223,12 +223,18 @@ rf_prob <- predict(rf_model, test2019, type = "prob")[, "Yes"]
 pred <- prediction(rf_prob, test2019$Wildfire)
 perf <- performance(pred, "tpr", "fpr")
 
-plot(perf, col = "blue", lwd = 2, main = "Random Forest ROC Curve (SMOTE)")
+# AUC
+auc_perf <- performance(pred, "auc")
+rf_auc <- auc_perf@y.values[[1]]
+rf_auc
+
+
+plot(perf, col = "blue", lwd = 2, main = "Random Forest ROC Curve")
 abline(0, 1, lty = 2, col = "gray")
 
 # Variable importance
 importance(rf_model)
-varImpPlot(rf_model, main = "Random Forest Feature Importance (SMOTE)")
+varImpPlot(rf_model, main = "Random Forest Feature Importance")
 
 imp <- importance(rf_model)
 
@@ -242,70 +248,11 @@ imp_df %>%
   geom_col() +
   coord_flip() +
   labs(
-    title = "Feature Importance for Wildfire Prediction (RF + SMOTE)",
+    title = "Feature Importance for Wildfire Prediction ",
     x = "Feature",
     y = "Mean Decrease in Gini"
   ) +
   theme_minimal(base_size = 13)
-```
-
-
- svm
-```{r}
-
-
-# ---------------------------
-# SVM (NO SMOTE)
-# ---------------------------
-
-svm_model <- svm(
-  Wildfire ~ .,
-  data = train2018,
-  kernel = "radial",
-  probability = TRUE,
-  scale = TRUE,
-  class.weights = c("No" = 1, "Yes" = 50)
-)
-
-# Predictions
-svm_pred <- predict(svm_model, test2019)
-
-svm_cm <- table(Predicted = svm_pred, Actual = test2019$Wildfire)
-svm_cm
-
-# Metrics
-TP <- svm_cm["Yes","Yes"]
-FN <- svm_cm["No","Yes"]
-FP <- svm_cm["Yes","No"]
-
-svm_accuracy <- sum(diag(svm_cm)) / sum(svm_cm)
-svm_precision <- TP / (TP + FP)
-svm_recall    <- TP / (TP + FN)
-svm_f1        <- 2 * (svm_precision * svm_recall) /
-                 (svm_precision + svm_recall)
-
-c(accuracy = svm_accuracy,
-  precision = svm_precision,
-  recall    = svm_recall,
-  F1        = svm_f1)
-
-# ROC + AUC
-svm_prob <- attr(
-  predict(svm_model, test2019, probability = TRUE),
-  "probabilities"
-)[, "Yes"]
-
-pred_svm <- prediction(svm_prob, test2019$Wildfire_num)
-perf_svm <- performance(pred_svm, "tpr", "fpr")
-
-plot(perf_svm, col="red", lwd=2, main="SVM ROC Curve")
-abline(0,1,lty=2)
-
-svm_auc <- performance(pred_svm, "auc")@y.values[[1]]
-svm_auc
-
-
-
 ```
 
 SVM + SMOTE
@@ -336,11 +283,29 @@ FP_svm <- svm_cm["Yes", "No"]
 svm_precision <- TP_svm / (TP_svm + FP_svm)
 svm_recall    <- TP_svm / (TP_svm + FN_svm)
 svm_f1        <- 2 * (svm_precision * svm_recall) / (svm_precision + svm_recall)
-
+ 
 c(
   accuracy  = svm_accuracy,
   precision = svm_precision,
   recall    = svm_recall,
   F1        = svm_f1
 )
+
+# Probability prediction
+svm_prob <- attr(
+  predict(svm_model, test2019, probability = TRUE),
+  "probabilities"
+)[, "Yes"]
+
+# ROCR performance objects
+pred_svm <- prediction(svm_prob, test2019$Wildfire)
+perf_svm <- performance(pred_svm, "tpr", "fpr")
+
+# Plot ROC curve
+plot(perf_svm, col = "red", lwd = 2, main = "SVM ROC Curve")
+abline(0, 1, lty = 2, col = "gray")
+
+# Compute AUC
+svm_auc <- performance(pred_svm, "auc")@y.values[[1]]
+svm_auc
 ```
