@@ -33,7 +33,9 @@ library(sf)
 library(ggplot2)
 library(tidyverse)
 library(tidymodels)
-library(themis)   
+library(themis)  
+library(kknn)
+library(yardstick)
 ```
 
 ```{r global-options, include=FALSE}
@@ -47,7 +49,7 @@ options(scientific=T, digits = 3)
 
 ## 1. Load data
 ```{r}
-fire_all <- read_csv("C:/Users/SIMBAH/Desktop/Fire_Incidence_Data 2018-2019.csv")
+fire_all <- read_csv("Fire_Incidence_Data 2018-2019.csv")
 glimpse(fire_all)
 ```
 ## 2.Confirm years in the Data
@@ -149,11 +151,18 @@ After applying upsampling to address class imbalance, the KNN model demonstrated
 ## 12. Classification Metrics (Accuracy, Recall, Precision, F1)
 
 ```{r metrics}
-metric_set(accuracy, precision, recall, f_meas)(
+knn_metrics = yardstick::metric_set(
+  yardstick::accuracy,
+  yardstick::precision,
+  yardstick::recall,
+  yardstick::f_meas
+)
+
+knn_metrics(
   fire_predictions,
   truth = Wildfire,
   estimate = .pred_class,
-  event_level = "second"   # ✅ This makes "Yes" (Wildfire) the positive class
+  event_level = 'second'
 )
 ```
 After specifying wildfire (“Yes”) as the positive class, the KNN model achieved an overall accuracy of 88.2%; however, its performance in detecting wildfire events was limited. The precision was 5.44%, indicating that only a small proportion of predicted wildfire events corresponded to actual wildfires. The recall was 12.84%, meaning that the model detected only about one out of every eight real wildfires. The F1-score of 7.65% further confirms the weak balance between precision and recall for wildfire detection. These results suggest that while the model performs well in identifying non-wildfire conditions, it struggles to reliably detect wildfire occurrences. This limitation is largely attributed to the strong class imbalance and the inherent complexity of wildfire–climate relationships.
@@ -197,4 +206,62 @@ autoplot(roc_obj) +
 
 ```
 
+# knn + SMOTE
 
+```{r}
+fire_recipe_smote <- recipe(
+  Wildfire ~ .,
+  data = fire_train
+) %>%
+  step_rm(Year) %>%                     
+  step_normalize(all_numeric_predictors()) %>%
+  step_smote(Wildfire)     
+
+fire_recipe_smote
+
+prep_smote <- prep(fire_recipe_smote)
+baked_smote <- bake(prep_smote, new_data = NULL)
+table(baked_smote$Wildfire)
+
+fire_wf_smote <- workflow() %>%
+  add_recipe(fire_recipe_smote) %>%
+  add_model(knn_model)
+
+fire_wf_smote
+
+knn_fit_smote <- fit(fire_wf_smote, data = fire_train)
+
+fire_predictions_smote <- predict(knn_fit_smote, fire_test) %>%
+  bind_cols(fire_test)
+
+head(fire_predictions_smote)
+
+conf_mat(
+  fire_predictions_smote,
+  truth   = Wildfire,
+  estimate = .pred_class
+)
+
+knn_metrics(
+  fire_predictions_smote,
+  truth    = Wildfire,
+  estimate = .pred_class,
+  event_level = "second"
+)
+
+fire_prob_smote <- predict(knn_fit_smote, fire_test, type = "prob") %>%
+  bind_cols(fire_test)
+
+colnames(fire_prob_smote)
+
+roc_obj_smote <- roc_curve(
+  fire_prob_smote,
+  truth = Wildfire,
+  .pred_Yes,
+  event_level = "second"
+)
+
+autoplot(roc_obj_smote) +
+  ggtitle("ROC Curve for KNN with SMOTE Wildfire Prediction (2019)") +
+  theme_minimal()
+```
