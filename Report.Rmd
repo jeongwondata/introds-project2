@@ -95,7 +95,9 @@ SMOTE-based preprocessing improved the model's ability to learn the minority cla
 ## 3.Limitations of the Study
 
 Despite improvements with SMOTE, the models still struggled to achieve high precision, indicating difficulty in correctly distinguishing non-wildfire events from actual fires.
+
 In addition, the dataset contains limited feature diversity, relying primarily on climate variables, without incorporating vegetation dryness, human activity, or land cover features.
-Finally, the temporal split (2018 train → 2019 test) reflects real-world conditions but introduces year-to-year variability that may reduce generalizability.
+
+Finally, the temporal split (2018 train / 2019 test) reflects real-world conditions but introduces year-to-year variability that may reduce generalizability.
 
 ## 4. Future Works
