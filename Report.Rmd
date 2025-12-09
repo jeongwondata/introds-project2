@@ -1,29 +1,101 @@
 ---
-title: "Report"
-output: html_document
-date: "2025-12-08"
+title: "Forecasting Wildfire Events from Climate Indicators: A Comparative ML Study"
+author:
+  Jeongwon Yoo  
+  Simbanegavi Simbarashe  
+  Nithin Ravindra Reddy  
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: show
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Set CRAN mirror
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+
+library(corrplot)
+library(dplyr)
+library(ezids)
+library(e1071)
+library(ggplot2)
+library(ROCR)
+library(gridExtra)
+library(lubridate)
+library(randomForest)
+library(readr)
+library(rpart)
+library(rpart.plot)
+library(viridis)
+library(spdep)
+library(spatialreg)
+library(smotefamily)
+library(sf)
+library(tigris)
+library(tidyr)
+library(tidymodels)
+library(treemapify)
+
+knitr::opts_chunk$set(echo = TRUE, results = "markup", warning = FALSE, message = FALSE)
+options(scientific = TRUE, digits = 3)
 ```
 
-## R Markdown
+# CHAPTER 1: Introduction
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## 0. Overview
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## 1. Objectives
 
-```{r cars}
-summary(cars)
-```
+## 2. Research Questions
 
-## Including Plots
+## 3. Significance of the Study
 
-You can also embed plots, for example:
+## 4. Weakness of the Study
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
+### 1.4.1 Imbalanced Data
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# CHAPTER 2 : EDA
+
+
+# CHAPTER 3 : Methodology
+
+## 1. Preprocessing pipeline (SMOTE)
+
+## 2. Train & Test split
+
+## 3. Modeling strategy
+
+### 3.3.1 KNN
+
+### 3.3.2 SVM
+
+### 3.3.3 Random Forest
+
+### 3.3.4 Decision Tree
+
+### 3.3.5 Logistic Regression
+
+# CHAPTER 4 : Conclusion & Future Works
+
+## 1. Summary of Findings
+
+Our analysis examined the relationship between climate variables and wildfire occurrence.
+The primary challenge was the extreme class imbalance, which caused most baseline models to fail at detecting wildfire events.
+SMOTE-based preprocessing improved the model's ability to learn the minority class, allowing us to evaluate which algorithms performed best in predicting wildfire events.
+
+## 2. Best Performing Model and Justification
+
+## 3.Limitations of the Study
+
+Despite improvements with SMOTE, the models still struggled to achieve high precision, indicating difficulty in correctly distinguishing non-wildfire events from actual fires.
+In addition, the dataset contains limited feature diversity, relying primarily on climate variables, without incorporating vegetation dryness, human activity, or land cover features.
+Finally, the temporal split (2018 train → 2019 test) reflects real-world conditions but introduces year-to-year variability that may reduce generalizability.
+
+## 4. Future Works
