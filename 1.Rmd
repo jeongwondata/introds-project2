@@ -272,3 +272,141 @@ results_logit_smote[] <- lapply(results_logit_smote, as.numeric)
 
 knitr::kable(results_logit_smote, digits = 4)
 ```
+
+```{r}
+library(broom)
+
+logit_tidy <- tidy(logit_smote_model) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    lower = exp(estimate - 1.96 * std.error),
+    upper = exp(estimate + 1.96 * std.error)
+  )
+
+ggplot(logit_tidy, aes(x = reorder(term, odds_ratio), y = odds_ratio)) +
+  geom_pointrange(aes(ymin = lower, ymax = upper)) +
+  coord_flip() +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  labs(
+    title = "Logistic Regression Odds Ratios (Wildfire = Yes)",
+    x = "Predictor",
+    y = "Odds ratio (95% CI)"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+```{r}
+library(rpart)
+library(rpart.plot)
+
+tree_small <- rpart(
+  Wildfire ~ .,
+  data = train_smote,
+  method = "class",
+  control = rpart.control(
+    maxdepth = 3,   # 트리 깊이 제한
+    minsplit = 500, # 너무 쪼개지지 않게
+    cp = 0.02
+  )
+)
+
+rpart.plot(
+  tree_small,
+  type  = 2,
+  extra = 104,
+  fallen.leaves = TRUE,
+  faclen = 3,
+  tweak = 1.0,
+  main  = "Simplified Decision Tree (Illustration Only)"
+)
+```
+
+```{r}
+library(dplyr)
+library(knitr)
+
+# 1. 평가 함수 정의 -----------------------------------
+eval_cutoff <- function(prob, actual, cutoff) {
+  pred <- ifelse(prob >= cutoff, "Yes", "No")
+  pred <- factor(pred, levels = c("No", "Yes"))
+  
+  cm <- table(Predicted = pred, Actual = actual)
+  
+  TP <- cm["Yes", "Yes"]
+  FP <- cm["Yes", "No"]
+  FN <- cm["No",  "Yes"]
+  TN <- cm["No",  "No"]
+  
+  accuracy  <- (TP + TN) / sum(cm)
+  precision <- TP / (TP + FP)
+  recall    <- TP / (TP + FN)
+  f1        <- 2 * precision * recall / (precision + recall)
+  
+  c(
+    cutoff    = cutoff,
+    accuracy  = accuracy,
+    precision = precision,
+    recall    = recall,
+    f1        = f1
+  )
+}
+
+# 2. 비교할 cutoff 값들 --------------------------------
+cutoffs <- c(0.1, 0.2, 0.3, 0.5)
+
+# 3. 각 cutoff에서 성능 계산 ---------------------------
+results_logit_smote <- t(
+  sapply(cutoffs, function(c) {
+    eval_cutoff(
+      prob   = test_2019$prob_yes_smote,
+      actual = test_2019$Wildfire,
+      cutoff = c
+    )
+  })
+)
+
+results_logit_smote <- as.data.frame(results_logit_smote)
+results_logit_smote[] <- lapply(results_logit_smote, as.numeric)
+
+# 4. 보기 좋게 정리 (퍼센트로 표시하고 반올림) ---------
+results_logit_smote_pretty <- results_logit_smote %>%
+  mutate(
+    accuracy  = round(accuracy,  3),
+    precision = round(precision, 3),
+    recall    = round(recall,    3),
+    f1        = round(f1,        3)
+  ) %>%
+  rename(
+    Cutoff    = cutoff,
+    Accuracy  = accuracy,
+    Precision = precision,
+    Recall    = recall,
+    `F1 Score` = f1
+  )
+
+# 5. 테이블 출력 (Rmd용) -------------------------------
+kable(results_logit_smote_pretty,
+      caption = "Logistic Regression (SMOTE) performance across different cutoffs")
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+ratio_df <- data %>%
+  count(Wildfire) %>%
+  mutate(percent = n / sum(n) * 100)
+
+ggplot(ratio_df, aes(x = Wildfire, y = percent, fill = Wildfire)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(
+    title = "Wildfire Class Distribution (%)",
+    x = "Wildfire",
+    y = "Percentage"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+```

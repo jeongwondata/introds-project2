@@ -453,6 +453,67 @@ c(
   F1        = svm_f1
 )
 ```
+```{r}
+library(e1071)
+library(ggplot2)
+
+num_predictors <- names(train2018)[sapply(train2018, is.numeric)]
+
+X <- as.matrix(train2018[, num_predictors])
+
+pca <- prcomp(X, scale. = TRUE)
+
+pca_df <- data.frame(
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2],
+  Wildfire = train2018$Wildfire
+)
+
+svm_pca <- svm(
+  Wildfire ~ PC1 + PC2,
+  data   = pca_df,
+  kernel = "radial",
+  scale  = TRUE
+)
+
+x_seq <- seq(min(pca_df$PC1), max(pca_df$PC1), length.out = 200)
+y_seq <- seq(min(pca_df$PC2), max(pca_df$PC2), length.out = 200)
+
+grid <- expand.grid(PC1 = x_seq, PC2 = y_seq)
+grid$pred <- predict(svm_pca, newdata = grid)
+
+ggplot() +
+  geom_tile(data = grid,
+            aes(x = PC1, y = PC2, fill = pred),
+            alpha = 0.3) +
+  geom_point(data = pca_df,
+             aes(x = PC1, y = PC2, color = Wildfire),
+             size = 1.2) +
+  scale_fill_manual(values = c("No" = "lightblue", "Yes" = "pink"),
+                    name = "SVM region") +
+  scale_color_manual(values = c("No" = "blue", "Yes" = "red"),
+                     name = "Actual") +
+  labs(
+    title = "SVM Decision Boundary in PCA Space",
+    x = "PC1",
+    y = "PC2"
+  ) +
+  theme_minimal(base_size = 14)
+
+```
+
+```{r}
+ggplot(pca_df, aes(x = PC1, y = PC2, color = Wildfire)) +
+  geom_point(alpha = 0.5, size = 1.2) +
+  scale_color_manual(values = c("No" = "blue", "Yes" = "red")) +
+  labs(
+    title = "Wildfire Classes in PCA Space",
+    x = "PC1",
+    y = "PC2"
+  ) +
+  theme_minimal(base_size = 14)
+
+```
 
 ### 3.3.3 Random Forest
 random forest
