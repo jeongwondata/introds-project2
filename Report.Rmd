@@ -303,7 +303,7 @@ autoplot(roc_obj_smote) +
 ```
 
 ### 3.3.2 SVM
-
+1. data
 ```{r}
 
 data_clean <- read.csv("Fire_Incidence_Data 2018-2019.csv")
@@ -331,89 +331,50 @@ table(data_clean$Wildfire, useNA = "ifany")
 table(train2018$Wildfire)
 
 colSums(is.na(train2018[train2018$Wildfire == "Yes", ]))
-```
-```{r}
-num_vars <- train2018[, c("pr","rmax","rmin","sph","srad","tmmn")]
 
-corr_mat <- cor(num_vars, method = "pearson")
 
-corrplot(corr_mat, method = "number", type="upper",
-         tl.col="black", title="Correlation Matrix (Climate Variables)")
-```
-```{r}
-yes_cases <- train2018 %>% filter(Wildfire == "Yes")
-no_cases  <- train2018 %>% filter(Wildfire == "No")
-
-set.seed(123)
-upsampled_yes <- yes_cases %>% sample_n(nrow(no_cases), replace = TRUE)
-
-train_balanced <- bind_rows(no_cases, upsampled_yes)
-
-table(train2018$Wildfire)
-table(train_balanced$Wildfire)   # now balanced
 ```
 
-1. SVM
+2.SMOTE
+
 ```{r}
+
+library(smotefamily)
+library(dplyr)
+
+# Remove Year
 train2018$Year <- NULL
-test2019$Year <- NULL
 
+# Convert target to numeric for smotefamily SMOTE
+# No = 0, Yes = 1
+train2018$Wildfire_num <- ifelse(train2018$Wildfire == "Yes", 1, 0)
 
-svm_model <- svm(
-  Wildfire ~ .,
-  data = train2018,
-  kernel = "radial",
-  probability = TRUE,
-  scale = TRUE,
-  class.weights = c("No" = 1, "Yes" = 50)
+# Prepare x and y
+x <- train2018 %>% select(-Wildfire, -Wildfire_num)
+y <- train2018$Wildfire_num
+
+# Apply SMOTE
+set.seed(123)
+smote_out <- SMOTE(x, y, K = 5)
+
+# Convert back to dataframe
+train_balanced <- smote_out$data
+
+# Rename target
+colnames(train_balanced)[ncol(train_balanced)] <- "Wildfire_num"
+
+# Convert numeric target back to factor Yes/No
+train_balanced$Wildfire <- factor(
+    ifelse(train_balanced$Wildfire_num == 1, "Yes", "No"),
+    levels = c("No", "Yes")
 )
 
+# Remove the numeric column
+train_balanced$Wildfire_num <- NULL
 
-# 4. Predictions
-svm_pred <- predict(svm_model, test2019)
+# Check class balance
+table(train_balanced$Wildfire)
 
-# 5. Confusion matrix
-svm_cm <- table(Predicted = svm_pred, Actual = test2019$Wildfire)
-svm_cm
-
-# 6. Accuracy
-svm_accuracy <- sum(diag(svm_cm)) / sum(svm_cm)
-svm_accuracy
-
-# Precision, Recall, F1
-TP <- svm_cm["Yes", "Yes"]
-FN <- svm_cm["No", "Yes"]
-FP <- svm_cm["Yes", "No"]
-
-svm_precision <- TP / (TP + FP)
-svm_recall    <- TP / (TP + FN)
-svm_f1        <- 2 * (svm_precision * svm_recall) / (svm_precision + svm_recall)
-
-c(
-  precision = svm_precision,
-  recall    = svm_recall,
-  F1        = svm_f1
-)
-
-# ---- ROC & AUC ----
-
-# Probability predictions
-svm_prob <- attr(
-  predict(svm_model, test2019, probability = TRUE),
-  "probabilities"
-)[, "Yes"]
-
-# ROCR performance objects
-pred_svm <- prediction(svm_prob, test2019$Wildfire)
-perf_svm <- performance(pred_svm, "tpr", "fpr")
-
-# Plot ROC curve
-plot(perf_svm, col = "red", lwd = 2, main = "SVM ROC Curve")
-abline(0, 1, lty = 2, col = "gray")
-
-# AUC
-svm_auc <- performance(pred_svm, "auc")@y.values[[1]]
-svm_auc
 
 
 ```
@@ -445,149 +406,38 @@ FP_svm <- svm_cm["Yes", "No"]
 svm_precision <- TP_svm / (TP_svm + FP_svm)
 svm_recall    <- TP_svm / (TP_svm + FN_svm)
 svm_f1        <- 2 * (svm_precision * svm_recall) / (svm_precision + svm_recall)
-
+ 
 c(
   accuracy  = svm_accuracy,
   precision = svm_precision,
   recall    = svm_recall,
   F1        = svm_f1
 )
-```
-```{r}
-library(e1071)
-library(ggplot2)
 
-num_predictors <- names(train2018)[sapply(train2018, is.numeric)]
+# Probability prediction
+svm_prob <- attr(
+  predict(svm_model, test2019, probability = TRUE),
+  "probabilities"
+)[, "Yes"]
 
-X <- as.matrix(train2018[, num_predictors])
+# ROCR performance objects
+pred_svm <- prediction(svm_prob, test2019$Wildfire)
+perf_svm <- performance(pred_svm, "tpr", "fpr")
 
-pca <- prcomp(X, scale. = TRUE)
+# Plot ROC curve
+plot(perf_svm, col = "red", lwd = 2, main = "SVM ROC Curve")
+abline(0, 1, lty = 2, col = "gray")
 
-pca_df <- data.frame(
-  PC1 = pca$x[, 1],
-  PC2 = pca$x[, 2],
-  Wildfire = train2018$Wildfire
-)
-
-svm_pca <- svm(
-  Wildfire ~ PC1 + PC2,
-  data   = pca_df,
-  kernel = "radial",
-  scale  = TRUE
-)
-
-x_seq <- seq(min(pca_df$PC1), max(pca_df$PC1), length.out = 200)
-y_seq <- seq(min(pca_df$PC2), max(pca_df$PC2), length.out = 200)
-
-grid <- expand.grid(PC1 = x_seq, PC2 = y_seq)
-grid$pred <- predict(svm_pca, newdata = grid)
-
-ggplot() +
-  geom_tile(data = grid,
-            aes(x = PC1, y = PC2, fill = pred),
-            alpha = 0.3) +
-  geom_point(data = pca_df,
-             aes(x = PC1, y = PC2, color = Wildfire),
-             size = 1.2) +
-  scale_fill_manual(values = c("No" = "lightblue", "Yes" = "pink"),
-                    name = "SVM region") +
-  scale_color_manual(values = c("No" = "blue", "Yes" = "red"),
-                     name = "Actual") +
-  labs(
-    title = "SVM Decision Boundary in PCA Space",
-    x = "PC1",
-    y = "PC2"
-  ) +
-  theme_minimal(base_size = 14)
-
-```
-
-```{r}
-ggplot(pca_df, aes(x = PC1, y = PC2, color = Wildfire)) +
-  geom_point(alpha = 0.5, size = 1.2) +
-  scale_color_manual(values = c("No" = "blue", "Yes" = "red")) +
-  labs(
-    title = "Wildfire Classes in PCA Space",
-    x = "PC1",
-    y = "PC2"
-  ) +
-  theme_minimal(base_size = 14)
-
+# Compute AUC
+svm_auc <- performance(pred_svm, "auc")@y.values[[1]]
+svm_auc
 ```
 
 ### 3.3.3 Random Forest
 random forest
 
 ```{r}
-
-
-rf_model <- randomForest(
-  Wildfire ~ .,
-  data = train_balanced,
-  ntree = 500,
-  importance = TRUE
-)
-
-rf_pred <- predict(rf_model, test2019)
-rf_cm <- table(Predicted = rf_pred, Actual = test2019$Wildfire)
-rf_cm
-
-
-rf_accuracy <- sum(diag(rf_cm)) / sum(rf_cm)
-rf_accuracy
-
-TP <- rf_cm["Yes","Yes"]
-FN <- rf_cm["No","Yes"]
-FP <- rf_cm["Yes","No"]
-
-rf_precision <- TP / (TP + FP)
-rf_recall    <- TP / (TP + FN)
-rf_f1        <- 2 * (rf_precision * rf_recall) / (rf_precision + rf_recall)
-
-c(precision = rf_precision, recall = rf_recall, F1 = rf_f1)
-
-rf_prob <- predict(rf_model, test2019, type = "prob")[,"Yes"]
-
-pred <- prediction(rf_prob, test2019$Wildfire)
-perf <- performance(pred, "tpr", "fpr")
-
-plot(perf, col="blue", lwd=2, main="Random Forest ROC Curve")
-abline(0,1,lty=2,col="gray")
-
-# Numeric importance values
-importance(rf_model)
-
-# Plot graph
-varImpPlot(rf_model, main = "Random Forest Feature Importance")
-
-```
-
-```{r}
-# Convert RF importance to a data frame
-imp <- importance(rf_model)
-
-imp_df <- data.frame(
-  Feature = rownames(imp),
-  Importance = imp[, "MeanDecreaseGini"]   # Change if you prefer MeanDecreaseAccuracy
-)
-
-# Plot all 20 features (no top_n needed)
-imp_df %>%
-  ggplot(aes(x = reorder(Feature, Importance), y = Importance)) +
-  geom_col(fill = "lightblue") +
-  coord_flip() +
-  labs(
-    title = "Feature Importance for Wildfire Prediction",
-    x = "Feature",
-    y = "Mean Decrease in Gini (Variable Importance)"
-  ) +
-  theme_minimal(base_size = 13)
-
-```
-
-Random Forest + SMOTE
-```{r}
-# 2) Random Forest on SMOTE balanced data
+# Random Forest on SMOTE balanced data
 set.seed(123)
 
 rf_model <- randomForest(
@@ -624,12 +474,18 @@ rf_prob <- predict(rf_model, test2019, type = "prob")[, "Yes"]
 pred <- prediction(rf_prob, test2019$Wildfire)
 perf <- performance(pred, "tpr", "fpr")
 
-plot(perf, col = "blue", lwd = 2, main = "Random Forest ROC Curve (SMOTE)")
+# AUC
+auc_perf <- performance(pred, "auc")
+rf_auc <- auc_perf@y.values[[1]]
+rf_auc
+
+
+plot(perf, col = "blue", lwd = 2, main = "Random Forest ROC Curve")
 abline(0, 1, lty = 2, col = "gray")
 
 # Variable importance
 importance(rf_model)
-varImpPlot(rf_model, main = "Random Forest Feature Importance (SMOTE)")
+varImpPlot(rf_model, main = "Random Forest Feature Importance")
 
 imp <- importance(rf_model)
 
@@ -643,7 +499,7 @@ imp_df %>%
   geom_col() +
   coord_flip() +
   labs(
-    title = "Feature Importance for Wildfire Prediction (RF + SMOTE)",
+    title = "Feature Importance for Wildfire Prediction ",
     x = "Feature",
     y = "Mean Decrease in Gini"
   ) +
