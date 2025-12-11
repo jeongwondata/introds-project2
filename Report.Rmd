@@ -619,7 +619,6 @@ best_cp <- tree_smote$cptable[which.min(tree_smote$cptable[, "xerror"]), "CP"]
 
 best_cp
 
-tree_pruned <- prune(tree_smote, cp = best_cp)
 
 rpart.plot(tree_pruned,type = 1,extra = 1,cex = 0.4,faclen = 3)
 
