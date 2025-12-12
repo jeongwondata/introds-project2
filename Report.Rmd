@@ -610,7 +610,7 @@ f1_s
 
 ```
 
-smote data has high risk of noise
+smote data has a high risk of noise
 Pruning tree
 ```{r}
 printcp(tree_smote)
