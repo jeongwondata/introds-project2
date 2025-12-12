@@ -62,10 +62,10 @@ options(scientific = TRUE, digits = 3)
 
 ### 1.4.1 Imbalanced Data
 
-# CHAPTER 2 : EDA
+# CHAPTER 2: EDA
 
 
-# CHAPTER 3 : Methodology
+# CHAPTER 3: Methodology
 
 ## 1. Preprocessing pipeline (SMOTE)
 
