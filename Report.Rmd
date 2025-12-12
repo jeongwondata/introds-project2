@@ -71,7 +71,7 @@ options(scientific = TRUE, digits = 3)
 
 ## 3.2 Train & Test split
 
-## 3. Modeling strategy
+## 3.3 Modeling strategy
 
 ### 3.3.1 KNN
 
@@ -434,7 +434,7 @@ svm_auc
 ```
 
 ### 3.3.3 Random Forest
-random forest
+Random forest
 
 ```{r}
 # Random Forest on SMOTE balanced data
@@ -657,7 +657,7 @@ The recall is still much higher than the original (non-SMOTE) model, but the fal
 
 ### 3.3.5 Logistic Regression
 
-logistic Regression
+Logistic Regression
 ```{r}
 logit_model = glm(Wildfire ~.,
                   data = train_2018,
