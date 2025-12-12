@@ -786,3 +786,11 @@ In addition, the dataset contains limited feature diversity, relying primarily o
 Finally, the temporal split (2018 train / 2019 test) reflects real-world conditions but introduces year-to-year variability that may reduce generalizability.
 
 ## 4. Future Works
+Add more features: vegetation dryness, land cover, human activity
+
+Explore advanced imbalance handling 
+
+Test stronger models: XGBoost, Gradient Boosting, ensembles
+
+Use spatial and temporal cross-validation for better generalization
+
