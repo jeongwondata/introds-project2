@@ -767,7 +767,7 @@ results_logit_smote[] <- lapply(results_logit_smote, as.numeric)
 knitr::kable(results_logit_smote, digits = 4)
 ```
 
-# CHAPTER 4 : Conclusion & Future Works
+# CHAPTER 4: Conclusion & Future Works
 
 ## 1. Summary of Findings
 
