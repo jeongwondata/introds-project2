@@ -50,15 +50,15 @@ options(scientific = TRUE, digits = 3)
 
 # CHAPTER 1: Introduction
 
-## 0. Overview
+## 1.0 Overview
 
-## 1. Objectives
+## 1.1 Objectives
 
-## 2. Research Questions
+## 1.2 Research Questions
 
-## 3. Significance of the Study
+## 1.3 Significance of the Study
 
-## 4. Weakness of the Study
+## 1.4 Weakness of the Study
 
 ### 1.4.1 Imbalanced Data
 
@@ -67,9 +67,9 @@ options(scientific = TRUE, digits = 3)
 
 # CHAPTER 3: Methodology
 
-## 1. Preprocessing pipeline (SMOTE)
+## 3.1 Preprocessing pipeline (SMOTE)
 
-## 2. Train & Test split
+## 3.2 Train & Test split
 
 ## 3. Modeling strategy
 
