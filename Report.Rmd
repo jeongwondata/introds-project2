@@ -769,15 +769,15 @@ knitr::kable(results_logit_smote, digits = 4)
 
 # CHAPTER 4: Conclusion & Future Works
 
-## 1. Summary of Findings
+## 4.1 Summary of Findings
 
 Our analysis examined the relationship between climate variables and wildfire occurrence.
 The primary challenge was the extreme class imbalance, which caused most baseline models to fail at detecting wildfire events.
 SMOTE-based preprocessing improved the model's ability to learn the minority class, allowing us to evaluate which algorithms performed best in predicting wildfire events.
 
-## 2. Best Performing Model and Justification
+## 4.2 Best Performing Model and Justification
 
-## 3.Limitations of the Study
+## 4.3 Limitations of the Study
 
 Despite improvements with SMOTE, the models still struggled to achieve high precision, indicating difficulty in correctly distinguishing non-wildfire events from actual fires.
 
@@ -785,7 +785,7 @@ In addition, the dataset contains limited feature diversity, relying primarily o
 
 Finally, the temporal split (2018 train / 2019 test) reflects real-world conditions but introduces year-to-year variability that may reduce generalizability.
 
-## 4. Future Works
+## 4.4 Future Works
 Add more features: vegetation dryness, land cover, human activity
 
 Explore advanced imbalance handling 
@@ -793,4 +793,6 @@ Explore advanced imbalance handling
 Test stronger models: XGBoost, Gradient Boosting, ensembles
 
 Use spatial and temporal cross-validation for better generalization
+
+## REFERENCES 
 
