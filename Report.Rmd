@@ -84,15 +84,15 @@ From a practical standpoint, the findings offer insights into how climate indica
 
 ## 1.4 Weaknesses of the Study
 
-Despite its contributions, this study has several limitations. First, the dataset primarily includes climate variables and lacks important contextual information such as vegetation dryness, land cover characteristics, and indicators of human activity. The absence of these factors may limit the models’ ability to fully capture the complex causes of wildfire events.
+Despite its contributions, this study has several limitations.
+
+First, the dataset primarily includes climate variables and lacks important contextual information. The absence of these factors may limit the models’ ability to fully capture the complex causes of wildfire events.
 
 Second, the analysis relies on a single temporal split with 2018 used for training and 2019 used for testing. While this setup reflects realistic forecasting conditions, it may reduce generalizability due to year to year climate variability. Finally, although multiple algorithms were evaluated, extensive hyperparameter tuning was limited in order to maintain interpretability and manage computational complexity.
 
-### 1.4.1 Imbalanced Data
-
 A major challenge in this study is the extreme class imbalance between wildfire and non wildfire observations. Wildfire events constitute a very small proportion of the dataset, allowing baseline models to achieve deceptively high accuracy by predominantly predicting the majority No class. As a result, these models perform poorly in identifying actual wildfire occurrences, leading to low recall and precision for the positive class.
 
-To address this issue, imbalance handling techniques such as upsampling and the Synthetic Minority Oversampling Technique were applied to the training data. While these approaches improved the models’ ability to detect wildfire events, they also increased the number of false positives, highlighting the trade off between recall and precision in rare event prediction. This limitation underscores the importance of careful metric selection and cautious interpretation of results when working with highly imbalanced classification problems.
+To address this issue, imbalance handling techniques such as upsampling and the Synthetic Minority Oversampling Technique were applied to the data. While these approaches improved the models’ ability to detect wildfire events, they also increased the number of false positives, highlighting the trade off between recall and precision in rare event prediction. This limitation underscores the importance of careful metric selection and cautious interpretation of results when working with highly imbalanced classification problems.
 
 # CHAPTER 2: EDA
 
@@ -116,6 +116,9 @@ ggplot(ratio_df, aes(x = Wildfire, y = percent, fill = Wildfire)) +
   theme_minimal(base_size = 14) +
   theme(legend.position = "none")
 ```
+The class distribution shows a severe imbalance, with wildfire events occurring far less frequently than non-wildfire cases.
+
+This imbalance explains why accuracy alone would be misleading, as a model could achieve high accuracy while failing to detect wildfire events. Addressing this imbalance is therefore essential for evaluating a model’s ability to identify wildfires rather than simply predicting the majority class.
 
 Correlation Matrix
 ```{r}
@@ -126,6 +129,9 @@ corr_mat <- cor(num_vars, method = "pearson")
 corrplot(corr_mat, method = "number", type="upper",
          tl.col="black", title="Correlation Matrix (Climate Variables)")
 ```
+The correlation matrix reveals moderate relationships among several climate variables, particularly those related to temperature and moisture.
+
+While no single pair shows extreme correlation, these patterns suggest partial redundancy among predictors and highlight the risk of multicollinearity. As a result, model performance should be interpreted holistically rather than relying on individual coefficients.
 
 # CHAPTER 3: Methodology
 
@@ -178,10 +184,9 @@ test_smote = smote(test_2019, target='Wildfire',K=5,seed=2)
 
 table(train_smote$Wildfire)
 table(test_smote$Wildfire)
-
-str(train_smote)
-str(test_smote)
 ```
+
+After applying SMOTE, the class counts become balanced, which prevents evaluation metrics from being dominated by the majority class. This allows model performance to be compared more directly in terms of wildfire detection ability and error trade-offs.
 
 ## 3.3 Modeling strategy
 
@@ -213,12 +218,12 @@ add_model(knn_model)
 knn_wf
 ```
 
-9. Train the Model on 2018 Data
+3. Train the Model on 2018 Data
 ```{r}
 knn_fit <- fit(knn_wf, data = train_smote)
 ```
 
-10. Predict Wildfire Occurrence for 2019
+4. Predict Wildfire Occurrence for 2019
 ```{r}
 knn_predictions <- predict(knn_fit, test_smote) %>%
 bind_cols(test_smote)
@@ -226,7 +231,7 @@ bind_cols(test_smote)
 head(knn_predictions)
 ```
 
-11. Confusion Matrix (Prediction Performance)
+5. Confusion Matrix (Prediction Performance)
 ```{r}
 conf_mat(
 knn_predictions,
@@ -235,9 +240,9 @@ estimate = .pred_class
 )
 ```
 
-After applying upsampling to address class imbalance, the KNN model demonstrated an improved ability to detect wildfire events. The confusion matrix shows that the model correctly classified 24,520 non-wildfire cases and successfully detected 137 wildfire occurrences. However, 930 wildfire cases were still misclassified as non-wildfire (false negatives), and 2,380 non-wildfire cases were incorrectly predicted as wildfire (false positives). Although some misclassification remains, the model shows a substantial improvement compared to the imbalanced version, which failed to detect any wildfire events. This result highlights the importance of addressing class imbalance in wildfire prediction tasks.
+After applying upsampling to address class imbalance, the KNN model demonstrated an improved ability to detect wildfire events. Although some misclassification remains, the model shows a substantial improvement compared to the imbalanced version, which failed to detect any wildfire events. This result highlights the importance of addressing class imbalance in wildfire prediction tasks.
 
-12. Classification Metrics (Accuracy, Recall, Precision, F1)
+6. Classification Metrics (Accuracy, Recall, Precision, F1)
 
 ```{r metrics}
 knn_metrics = yardstick::metric_set(
@@ -255,9 +260,9 @@ knn_metrics(
 )
 ```
 
-After specifying wildfire (“Yes”) as the positive class, the KNN model achieved an overall accuracy of 88.2%; however, its performance in detecting wildfire events was limited. The precision was 5.44%, indicating that only a small proportion of predicted wildfire events corresponded to actual wildfires. The recall was 12.84%, meaning that the model detected only about one out of every eight real wildfires. The F1-score of 7.65% further confirms the weak balance between precision and recall for wildfire detection. These results suggest that while the model performs well in identifying non-wildfire conditions, it struggles to reliably detect wildfire occurrences. This limitation is largely attributed to the strong class imbalance and the inherent complexity of wildfire–climate relationships.
+With wildfire (Yes) treated as the positive class, the KNN model achieves precision = 0.684 and recall = 0.383, resulting in an F1-score = 0.491. This indicates the model is relatively conservative in its wildfire predictions, with moderate sensitivity to wildfire events and a noticeable number of missed wildfire cases. Overall accuracy (0.605) is not the primary indicator of success here because the goal is to correctly detect wildfire occurrences under balanced evaluation conditions.
 
-13. Kappa
+7. Kappa
 ```{r kappa_wildfire}
 metric_set(kap)(
   knn_predictions,
@@ -270,20 +275,17 @@ metric_set(kap)(
 
 Although the KNN model achieved high accuracy, the very low Kappa value confirms that its predictive power for wildfire occurrence is weak and only marginally better than random guessing.
 
-14. ROC-AUC 
+8. ROC-AUC 
 
-```{r fire-prob}
+```{r knn-prob}
 # Get predicted probabilities for both classes
-fire_prob <- predict(knn_fit, test_smote, type = "prob") %>%
+knn_prob <- predict(knn_fit, test_smote, type = "prob") %>%
   bind_cols(test_smote)
-
-# Check the probability column names
-colnames(fire_prob)
 ```
 ```{r roc-plot, fig.width=7, fig.height=6}
 # Create ROC object
 roc_obj <- roc_curve(
-  fire_prob,
+  knn_prob,
   truth = Wildfire,
   .pred_Yes,
   event_level = "second"
@@ -296,7 +298,13 @@ autoplot(roc_obj) +
 
 ```
 
+The ROC curve for the KNN model illustrates its ability to distinguish between wildfire and non-wildfire cases across different classification thresholds. While the curve remains above the diagonal reference line, indicating performance better than random guessing, it does not show strong separation between the two classes. This suggests that although KNN captures some signal in the data, its overall ranking ability is limited compared to stronger models.
+
 ### 3.3.2 SVM
+
+The SVM model is designed to find a decision boundary that maximizes separation between wildfire and non-wildfire cases in the feature space.
+
+By allowing a flexible margin, the model can capture non-linear relationships among climate variables that simpler linear models may miss. This makes SVM a strong candidate for comparison in this wildfire classification task.
 
 ```{r}
 svm_model <- svm(
@@ -311,7 +319,17 @@ svm_model <- svm(
 svm_pred <- predict(svm_model, test_smote)
 svm_cm <- table(Predicted = svm_pred, Actual = test_smote$Wildfire)
 svm_cm
+```
 
+```{r}
+conf_mat(
+svm_pred,
+truth = Wildfire,
+estimate = .pred_class
+)
+```
+
+```{r}
 # Accuracy
 svm_accuracy <- sum(diag(svm_cm)) / sum(svm_cm)
 
@@ -330,7 +348,13 @@ c(
   recall    = svm_recall,
   F1        = svm_f1
 )
+```
+The SVM achieves precision = 0.669 and recall = 0.507, resulting in an F1-score = 0.577.
 
+This indicates that, under balanced evaluation, the model identifies about half of wildfire events while maintaining moderate precision, but missed wildfire detections remain a key limitation. Accuracy (0.630) is reported for completeness, but recall and F1-score are more informative for assessing wildfire detection performance in this setting
+
+
+```{r}
 # Probability prediction
 svm_prob <- attr(
   predict(svm_model, test_smote, probability = TRUE),
@@ -349,6 +373,9 @@ abline(0, 1, lty = 2, col = "gray")
 svm_auc <- performance(pred_svm, "auc")@y.values[[1]]
 svm_auc
 ```
+The SVM ROC curve summarizes how well the model separates wildfire from non-wildfire cases across all possible thresholds using predicted probabilities.
+
+Because ROC performance is threshold-independent, it complements the confusion matrix and recall-based evaluation by showing overall ranking ability rather than performance at a single cutoff. In this report, the ROC curve is used to support model comparison, while final judgment still emphasizes recall and F1-score due to the cost of missed wildfire events.
 
 ### 3.3.3 Random Forest
 
@@ -366,7 +393,10 @@ rf_model <- randomForest(
 rf_pred <- predict(rf_model, test_smote)
 rf_cm <- table(Predicted = rf_pred, Actual = test_smote$Wildfire)
 rf_cm
+```
 
+
+```{r}
 # Metrics
 rf_accuracy <- sum(diag(rf_cm)) / sum(rf_cm)
 
@@ -383,8 +413,12 @@ c(accuracy = rf_accuracy,
   recall    = rf_recall,
   F1        = rf_f1)
 
+```
+
+
+```{r}
 # ROC curve
-rf_prob <- predict((rf_model, test_smote) type = "prob")[,"Yes"]
+rf_prob <- predict(rf_model, newdata=test_smote, type = "prob")[,"Yes"]
 
 pred <- prediction(rf_prob, test_smote$Wildfire)
 perf <- performance(pred, "tpr", "fpr")
@@ -397,29 +431,8 @@ rf_auc
 
 plot(perf, col = "blue", lwd = 2, main = "Random Forest ROC Curve")
 abline(0, 1, lty = 2, col = "gray")
-
-# Variable importance
-importance(rf_model)
-varImpPlot(rf_model, main = "Random Forest Feature Importance")
-
-imp <- importance(rf_model)
-
-imp_df <- data.frame(
-  Feature    = rownames(imp),
-  Importance = imp[, "MeanDecreaseGini"]
-)
-
-imp_df %>%
-  ggplot(aes(x = reorder(Feature, Importance), y = Importance)) +
-  geom_col() +
-  coord_flip() +
-  labs(
-    title = "Feature Importance for Wildfire Prediction ",
-    x = "Feature",
-    y = "Mean Decrease in Gini"
-  ) +
-  theme_minimal(base_size = 13)
 ```
+
 
 ### 3.3.4 Decision Tree
 
@@ -436,7 +449,9 @@ test_smote$tree_pred_smote = predict(tree_smote,
 cm_smote = table(Predicted = test_smote$tree_pred_smote,
                  Actual= test_smote$Wildfire)
 cm_smote
+```
 
+```{r}
 TP_s = cm_smote["Yes", "Yes"]
 FP_s = cm_smote["Yes", "No"]
 FN_s = cm_smote["No",  "Yes"]
@@ -453,6 +468,8 @@ recall_s
 f1_s
 
 ```
+
+The decision tree model improves interpretability by explicitly modeling decision rules based on climate variables. Compared to logistic regression, the tree demonstrates improved recall, indicating better sensitivity to wildfire events. However, this gain is accompanied by increased false positives, reflecting a trade-off between detection and over-alerting.
 
 smote data has a high risk of noise
 Pruning tree
@@ -493,12 +510,31 @@ accuracy_p
 precision_p
 recall_p
 f1_p
+
+tree_prob <- predict(tree_pruned, test_smote, type = "prob")[, "Yes"]
+
+tree_prob <- data.frame(
+  .pred_Yes = tree_prob,
+  model = "Decision Tree"
+)
 ```
 
-The pruned decision tree produced the same evaluation metrics as the original SMOTE-trained tree. After pruning, the model has an accuracy of about 77 percent, a precision of around 5 percent, and a recall of around 29.5 percent for the “Yes” class. This means pruning simplified the tree structure but did not meaningfully change how the model classifies wildfire events.
-The recall is still much higher than the original (non-SMOTE) model, but the false positive count remains large, which keeps the precision low. Overall, SMOTE improved the model’s ability to detect rare “Yes” cases, and pruning helped reduce model complexity without affecting performance.
+Pruning reduces model complexity and helps prevent overfitting to the training data. The pruned tree shows more balanced performance, with slightly reduced recall but improved generalization. This suggests that controlling model complexity leads to more stable wildfire predictions under balanced evaluation conditions.
 
+```{r}
+# Create ROC object
+roc_dt <- roc_curve(
+  tree_prob,
+  truth = Wildfire,
+  .pred_Yes,
+  event_level = "second"
+)
 
+# Plot ROC curve using ggplot
+autoplot(roc_dt) +
+  ggtitle("ROC Curve for Pruned Decision Tree (2019)") +
+  theme_minimal()
+```
 
 ### 3.3.5 Logistic Regression
 
@@ -512,7 +548,10 @@ logit_smote_model <- glm(
 )
 
 summary(logit_smote_model)
+```
+The logistic regression model provides a transparent baseline for wildfire prediction. While it captures general trends in the data, its recall remains limited, indicating difficulty in identifying wildfire events under a linear decision boundary. This result suggests that more flexible, non-linear models may be better suited for capturing complex wildfire–climate relationships..
 
+```{r}
 test_smote$prob_yes_smote <- predict(
   logit_smote_model,
   newdata = test_smote,
@@ -563,8 +602,31 @@ results_logit_smote <- as.data.frame(results_logit_smote)
 results_logit_smote[] <- lapply(results_logit_smote, as.numeric)
 
 knitr::kable(results_logit_smote, digits = 4)
-```
 
+logit_prob <- predict(logit_smote_model, test_smote, type = "response")
+
+logit_prob <- data.frame(
+  .pred_Yes = logit_prob,
+  model = "Logistic Regression"
+)
+
+```
+The confusion matrix shows that a substantial portion of wildfire cases are misclassified as non-wildfire, resulting in lower recall. Although false positives are relatively controlled, the cost of missed wildfire detections is high in this context. Therefore, recall is prioritized over overall accuracy for model evaluation.
+
+```{r}
+# Create ROC object
+roc_l <- roc_curve(
+  logit_prob,
+  truth = Wildfire,
+  .pred_Yes,
+  event_level = "second"
+)
+
+# Plot ROC curve using ggplot
+autoplot(roc_l) +
+  ggtitle("ROC Curve for Logistic Regression (2019)") +
+  theme_minimal()
+```
 # CHAPTER 4: Conclusion & Future Works
 
 ## 4.1 Summary of Findings
@@ -574,6 +636,140 @@ The primary challenge was the extreme class imbalance, which caused most baselin
 SMOTE-based preprocessing improved the model's ability to learn the minority class, allowing us to evaluate which algorithms performed best in predicting wildfire events.
 
 ## 4.2 Best Performing Model and Justification
+
+Comparing Recall & F1 Score
+```{r}
+logit_prob <- predict(logit_smote_model, newdata = test_smote, type = "response")
+logit_prob <- as.numeric(logit_prob)
+
+knn_pred_class = predict(knn_fit, test_smote)$.pred_class
+svm_pred_class = predict(svm_model, test_smote)
+rf_pred_class = predict(rf_model, newdata=test_smote, type='class')
+dt_pred_class = predict(tree_pruned, newdata = test_smote, type='class')
+logit_pred_class = factor(ifelse(logit_prob >= 0.5, 'Yes','No'), levels = c('No','Yes'))
+
+fix_levels = function(x) factor(x, levels = c('No','Yes'))
+truth_fix = fix_levels(test_smote$Wildfire)
+
+knn_pred_class = fix_levels(knn_pred_class)
+svm_pred_class = fix_levels(svm_pred_class)
+rf_pred_class = fix_levels(rf_pred_class)
+dt_pred_class = fix_levels(dt_pred_class)
+logit_pred_class = fix_levels(logit_pred_class)
+
+metric_c = yardstick::metric_set(recall,f_meas)
+metrics_df = bind_rows(
+  tibble(model='KNN', truth = truth_fix, estimate = knn_pred_class),
+  tibble(model='SVM', truth = truth_fix, estimate = svm_pred_class),
+  tibble(model='Random Forest', truth = truth_fix, estimate = rf_pred_class),
+  tibble(model='Decision Tree', truth = truth_fix, estimate = dt_pred_class),
+  tibble(model='Logistic Regression', truth = truth_fix, estimate = logit_pred_class)
+)%>%
+  group_by(model)%>%
+  metric_c(truth=truth, estimate = estimate, event_level = 'second')%>%
+  ungroup()%>%
+  select(model, .metric,.estimate)
+
+ggplot(metrics_df, aes(x=model, y=.estimate, fill=.metric)) + geom_col(position = position_dodge(width=0.8), width =0.7) + coord_flip()+ labs(
+  title = 'Comparing Recall and F1 Score Across Models(SMOTE-balanced)',
+  x='Models',
+  y='Score',
+  fil='Metric'
+)+
+  theme_minimal(base_size=14) +
+  theme(axis.test.x = element_text(angle=25, hjust=1))
+```
+
+
+Comparing AUC-ROC
+```{r}
+rm(roc_df)
+gc()
+
+# KNN
+knn_df <- tibble(
+  Wildfire = test_smote$Wildfire,
+  .pred_Yes = predict(knn_fit, test_smote, type = "prob")$.pred_Yes,
+  model = "KNN"
+)
+
+# SVM
+svm_df <- tibble(
+  Wildfire = test_smote$Wildfire,
+  .pred_Yes = as.numeric(svm_prob),
+  model = "SVM"
+)
+
+# Random Forest
+rf_df <- tibble(
+  Wildfire = test_smote$Wildfire,
+  .pred_Yes = as.numeric(rf_prob),
+  model = "Random Forest"
+)
+
+# Decision Tree
+tree_df <- tibble(
+  Wildfire = test_smote$Wildfire,
+  .pred_Yes = as.numeric(tree_prob$.pred_Yes),
+  model = "Decision Tree"
+)
+
+# Logistic
+logit_vec <- if (is.data.frame(logit_prob)) logit_prob[[1]] else logit_prob
+
+logit_df <- tibble(
+  Wildfire = test_smote$Wildfire,
+  .pred_Yes = as.numeric(logit_vec),
+  model = "Logistic Regression"
+)
+
+roc_df <- bind_rows(knn_df, svm_df, rf_df, tree_df, logit_df)
+
+roc_data = roc_df%>%
+  group_by(model)%>%
+  roc_curve(
+    truth=Wildfire,
+    .pred_Yes,
+    event_level = 'second'
+  )
+
+ggplot(roc_data, aes(x=1-specificity, y=sensitivity, color=model)) +
+  geom_line(size=1.2)+
+  geom_abline(linetype='dashed', color ='gray50') +
+  labs(
+    title = 'ROC Curve Comparison Across Models (SMOTE-balanced)',
+    x='False Positive Rate',
+    y='True Positive Rate',
+    color='Model') +
+  theme_minimal(base_size=14)
+
+```
+
+
+```{r}
+```{r}
+# Variable importance
+importance(rf_model)
+varImpPlot(rf_model, main = "Random Forest Feature Importance")
+
+imp <- importance(rf_model)
+
+imp_df <- data.frame(
+  Feature    = rownames(imp),
+  Importance = imp[, "MeanDecreaseGini"]
+)
+
+imp_df %>%
+  ggplot(aes(x = reorder(Feature, Importance), y = Importance)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Feature Importance for Wildfire Prediction ",
+    x = "Feature",
+    y = "Mean Decrease in Gini"
+  ) +
+  theme_minimal(base_size = 13)
+```
 
 ## 4.3 Limitations of the Study
 

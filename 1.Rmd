@@ -296,37 +296,12 @@ ggplot(logit_tidy, aes(x = reorder(term, odds_ratio), y = odds_ratio)) +
   theme_minimal(base_size = 13)
 ```
 
-```{r}
-library(rpart)
-library(rpart.plot)
-
-tree_small <- rpart(
-  Wildfire ~ .,
-  data = train_smote,
-  method = "class",
-  control = rpart.control(
-    maxdepth = 3,   # 트리 깊이 제한
-    minsplit = 500, # 너무 쪼개지지 않게
-    cp = 0.02
-  )
-)
-
-rpart.plot(
-  tree_small,
-  type  = 2,
-  extra = 104,
-  fallen.leaves = TRUE,
-  faclen = 3,
-  tweak = 1.0,
-  main  = "Simplified Decision Tree (Illustration Only)"
-)
-```
 
 ```{r}
 library(dplyr)
 library(knitr)
 
-# 1. 평가 함수 정의 -----------------------------------
+
 eval_cutoff <- function(prob, actual, cutoff) {
   pred <- ifelse(prob >= cutoff, "Yes", "No")
   pred <- factor(pred, levels = c("No", "Yes"))
@@ -352,10 +327,9 @@ eval_cutoff <- function(prob, actual, cutoff) {
   )
 }
 
-# 2. 비교할 cutoff 값들 --------------------------------
 cutoffs <- c(0.1, 0.2, 0.3, 0.5)
 
-# 3. 각 cutoff에서 성능 계산 ---------------------------
+
 results_logit_smote <- t(
   sapply(cutoffs, function(c) {
     eval_cutoff(
@@ -369,7 +343,6 @@ results_logit_smote <- t(
 results_logit_smote <- as.data.frame(results_logit_smote)
 results_logit_smote[] <- lapply(results_logit_smote, as.numeric)
 
-# 4. 보기 좋게 정리 (퍼센트로 표시하고 반올림) ---------
 results_logit_smote_pretty <- results_logit_smote %>%
   mutate(
     accuracy  = round(accuracy,  3),
@@ -385,7 +358,6 @@ results_logit_smote_pretty <- results_logit_smote %>%
     `F1 Score` = f1
   )
 
-# 5. 테이블 출력 (Rmd용) -------------------------------
 kable(results_logit_smote_pretty,
       caption = "Logistic Regression (SMOTE) performance across different cutoffs")
 
