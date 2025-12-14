@@ -1,9 +1,9 @@
 ---
 title: "Forecasting Wildfire Events from Climate Indicators: A Comparative ML Study"
 author:
-  Jeongwon Yoo  
+  Jeongwon Yoo
+  Nithin Ravindra Reddy
   Simbanegavi Simbarashe  
-  Nithin Ravindra Reddy  
 date: "`r Sys.Date()`"
 output:
   html_document:
@@ -46,6 +46,8 @@ library(treemapify)
 
 knitr::opts_chunk$set(echo = TRUE, results = "markup", warning = FALSE, message = FALSE)
 options(scientific = TRUE, digits = 3)
+
+
 ```
 
 # CHAPTER 1: Introduction
@@ -94,81 +96,102 @@ To address this issue, imbalance handling techniques such as upsampling and the 
 
 # CHAPTER 2: EDA
 
+Wildfire Yes/No Ratio
+
+```{r}
+data = read_csv("Fire_Incidence_Data 2018-2019.csv")
+
+ratio_df <- data %>%
+  count(Wildfire) %>%
+  mutate(percent = n / sum(n) * 100)
+
+ggplot(ratio_df, aes(x = Wildfire, y = percent, fill = Wildfire)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(
+    title = "Wildfire Class Distribution (%)",
+    x = "Wildfire",
+    y = "Percentage"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+```
+
+Correlation Matrix
+```{r}
+num_vars <- data[, c("pr","rmax","rmin","sph","srad","tmmn")]
+
+corr_mat <- cor(num_vars, method = "pearson")
+
+corrplot(corr_mat, method = "number", type="upper",
+         tl.col="black", title="Correlation Matrix (Climate Variables)")
+```
 
 # CHAPTER 3: Methodology
 
-## 3.1 Preprocessing pipeline (SMOTE)
+## 3.1 Preprocessing pipeline
 
-## 3.2 Train & Test split
+```{r}
+model = data %>%
+  mutate(Wildfire = trimws(Wildfire),
+         Wildfire = factor(Wildfire, levels = c('No','Yes')))%>%
+  tidyr::drop_na()
+
+table(data$Wildfire)
+table(data$Year)
+```
+
+## 3.2 Train & Test split(SMOTE)
+
+```{r}
+train_2018 = model %>% filter(Year==2018) %>% select(-Year)
+test_2019 = model %>% filter(Year==2019) %>% select(-Year)
+
+smote = function(df,target='Wildfire',K=5,seed=2){
+  df = as.data.frame(df)
+  
+  y = df[[target]]
+  X = df[,setdiff(names(df), target), drop = FALSE]
+  
+   y_num = ifelse(y =='Yes',1,0)
+   
+   set.seed(seed)
+   sm = smotefamily::SMOTE(X, y_num, K=K)
+   
+   out = sm$data
+   colnames(out)[ncol(out)] = 'y_num'
+   
+   out[[target]] = factor(
+     ifelse(out$y_num == 1, 'Yes','No'),
+     levels = c('No','Yes')
+   )
+   
+   out$y_num = NULL
+   
+   out = out[,c(setdiff(names(out), target), target)]
+   
+   return(out)
+}
+
+train_smote = smote(train_2018, target='Wildfire', K=5, seed=2)
+test_smote = smote(test_2019, target='Wildfire',K=5,seed=2)
+
+table(train_smote$Wildfire)
+table(test_smote$Wildfire)
+
+str(train_smote)
+str(test_smote)
+```
 
 ## 3.3 Modeling strategy
 
 ### 3.3.1 KNN
 
- 1. Load data
 ```{r}
-fire_all <- read_csv("Fire_Incidence_Data 2018-2019.csv")
-glimpse(fire_all)
+fire_recipe_knn = recipe(Wildfire~., data = train_smote) %>% step_normalize(all_numeric_predictors())
 ```
 
-2. Confirm years in the Data
-```{r}
-table(fire_all$Year)
-```
-
-3. Select Target + Climate Predictors + Location
-```{r}
-fire_model <- fire_all %>%
-select(
-Wildfire,     # TARGET (Yes/No)
-Year,
-latitude,
-longitude,
-pr,
-rmax,
-rmin,
-sph,
-srad,
-tmmn
-) %>%
-drop_na()
-
-glimpse(fire_model)
-```
-
-4.Convert Wildfire to a Factor
-```{r}
-fire_model <- fire_model %>%
-mutate(Wildfire = as.factor(Wildfire))
-
-levels(fire_model$Wildfire)
-```
-
-5.Temporal Split (2018 = TRAIN, 2019 = TEST)
-```{r}
-fire_train <- fire_model %>%
-filter(Year == 2018)
-
-fire_test <- fire_model %>%
-filter(Year == 2019)
-
-nrow(fire_train)
-nrow(fire_test)
-```
-
-6. Preprocessing Recipe (Training Data ONLY)
-```{r recipe}
-fire_recipe <- recipe(
-  Wildfire ~ .,
-  data = fire_train
-) %>%
-  step_rm(Year) %>%                     
-  step_normalize(all_numeric_predictors()) %>%
-  step_upsample(Wildfire)
-
-```
-
-7. Define the KNN Classification Model
+1. Define the KNN Classification Model
 ```{r}
 knn_model <- nearest_neighbor(
 neighbors = 5,
@@ -181,32 +204,32 @@ set_mode("classification")
 knn_model
 ```
 
-8. Create the Workflow
+2. Create the Workflow
 ```{r}
-fire_wf <- workflow() %>%
-add_recipe(fire_recipe) %>%
+knn_wf <- workflow() %>%
+add_recipe(fire_recipe_knn) %>%
 add_model(knn_model)
 
-fire_wf
+knn_wf
 ```
 
 9. Train the Model on 2018 Data
 ```{r}
-knn_fit <- fit(fire_wf, data = fire_train)
+knn_fit <- fit(knn_wf, data = train_smote)
 ```
 
 10. Predict Wildfire Occurrence for 2019
 ```{r}
-fire_predictions <- predict(knn_fit, fire_test) %>%
-bind_cols(fire_test)
+knn_predictions <- predict(knn_fit, test_smote) %>%
+bind_cols(test_smote)
 
-head(fire_predictions)
+head(knn_predictions)
 ```
 
 11. Confusion Matrix (Prediction Performance)
 ```{r}
 conf_mat(
-fire_predictions,
+knn_predictions,
 truth = Wildfire,
 estimate = .pred_class
 )
@@ -225,7 +248,7 @@ knn_metrics = yardstick::metric_set(
 )
 
 knn_metrics(
-  fire_predictions,
+  knn_predictions,
   truth = Wildfire,
   estimate = .pred_class,
   event_level = 'second'
@@ -237,7 +260,7 @@ After specifying wildfire (“Yes”) as the positive class, the KNN model achie
 13. Kappa
 ```{r kappa_wildfire}
 metric_set(kap)(
-  fire_predictions,
+  knn_predictions,
   truth = Wildfire,
   estimate = .pred_class,
   event_level = "second"   # "Yes" (Wildfire) is the positive class
@@ -251,8 +274,8 @@ Although the KNN model achieved high accuracy, the very low Kappa value confirms
 
 ```{r fire-prob}
 # Get predicted probabilities for both classes
-fire_prob <- predict(knn_fit, fire_test, type = "prob") %>%
-  bind_cols(fire_test)
+fire_prob <- predict(knn_fit, test_smote, type = "prob") %>%
+  bind_cols(test_smote)
 
 # Check the probability column names
 colnames(fire_prob)
@@ -273,157 +296,20 @@ autoplot(roc_obj) +
 
 ```
 
-15. knn + SMOTE
-```{r}
-fire_recipe_smote <- recipe(
-  Wildfire ~ .,
-  data = fire_train
-) %>%
-  step_rm(Year) %>%                     
-  step_normalize(all_numeric_predictors()) %>%
-  step_smote(Wildfire)     
-
-fire_recipe_smote
-
-prep_smote <- prep(fire_recipe_smote)
-baked_smote <- bake(prep_smote, new_data = NULL)
-table(baked_smote$Wildfire)
-
-fire_wf_smote <- workflow() %>%
-  add_recipe(fire_recipe_smote) %>%
-  add_model(knn_model)
-
-fire_wf_smote
-
-knn_fit_smote <- fit(fire_wf_smote, data = fire_train)
-
-fire_predictions_smote <- predict(knn_fit_smote, fire_test) %>%
-  bind_cols(fire_test)
-
-head(fire_predictions_smote)
-
-conf_mat(
-  fire_predictions_smote,
-  truth   = Wildfire,
-  estimate = .pred_class
-)
-
-knn_metrics(
-  fire_predictions_smote,
-  truth    = Wildfire,
-  estimate = .pred_class,
-  event_level = "second"
-)
-
-fire_prob_smote <- predict(knn_fit_smote, fire_test, type = "prob") %>%
-  bind_cols(fire_test)
-
-colnames(fire_prob_smote)
-
-roc_obj_smote <- roc_curve(
-  fire_prob_smote,
-  truth = Wildfire,
-  .pred_Yes,
-  event_level = "second"
-)
-
-autoplot(roc_obj_smote) +
-  ggtitle("ROC Curve for KNN with SMOTE Wildfire Prediction (2019)") +
-  theme_minimal()
-```
-
 ### 3.3.2 SVM
 
-1. Data Explore
 ```{r}
-
-data_clean <- read.csv("Fire_Incidence_Data 2018-2019.csv")
-
-# 1. Clean target variable BEFORE splitting
-data_clean$Wildfire <- trimws(data_clean$Wildfire)
-data_clean$Wildfire <- factor(data_clean$Wildfire, levels = c("No","Yes"))
-
-table(data_clean$Wildfire)
-
-# 2. Split into train (2018) and test (2019)
-train2018 <- subset(data_clean, Year == 2018, select = -Year)
-test2019  <- subset(data_clean, Year == 2019, select = -Year)
-
-data_clean$Wildfire <- factor(data_clean$Wildfire, levels = c("No", "Yes"))
-str(data_clean$Wildfire)
-table(data_clean$Wildfire)
-
-nrow(train2018)
-nrow(test2019)
-
-print(colnames(data_clean))
-table(data_clean$Wildfire, useNA = "ifany")
-
-table(train2018$Wildfire)
-
-colSums(is.na(train2018[train2018$Wildfire == "Yes", ]))
-
-
-```
-
-2.SMOTE
-
-```{r}
-
-library(smotefamily)
-library(dplyr)
-
-# Remove Year
-train2018$Year <- NULL
-
-# Convert target to numeric for smotefamily SMOTE
-# No = 0, Yes = 1
-train2018$Wildfire_num <- ifelse(train2018$Wildfire == "Yes", 1, 0)
-
-# Prepare x and y
-x <- train2018 %>% select(-Wildfire, -Wildfire_num)
-y <- train2018$Wildfire_num
-
-# Apply SMOTE
-set.seed(123)
-smote_out <- SMOTE(x, y, K = 5)
-
-# Convert back to dataframe
-train_balanced <- smote_out$data
-
-# Rename target
-colnames(train_balanced)[ncol(train_balanced)] <- "Wildfire_num"
-
-# Convert numeric target back to factor Yes/No
-train_balanced$Wildfire <- factor(
-    ifelse(train_balanced$Wildfire_num == 1, "Yes", "No"),
-    levels = c("No", "Yes")
-)
-
-# Remove the numeric column
-train_balanced$Wildfire_num <- NULL
-
-# Check class balance
-table(train_balanced$Wildfire)
-
-
-
-```
-
-2. SVM + SMOTE
-```{r}
-# SVM on SMOTE balanced data
 svm_model <- svm(
   Wildfire ~ .,
-  data = train_balanced,   # SMOTE data
+  data = train_smote,
   kernel = "radial",
   probability = TRUE,
   scale = TRUE
 )
 
 # Predictions
-svm_pred <- predict(svm_model, test2019)
-svm_cm <- table(Predicted = svm_pred, Actual = test2019$Wildfire)
+svm_pred <- predict(svm_model, test_smote)
+svm_cm <- table(Predicted = svm_pred, Actual = test_smote$Wildfire)
 svm_cm
 
 # Accuracy
@@ -447,12 +333,12 @@ c(
 
 # Probability prediction
 svm_prob <- attr(
-  predict(svm_model, test2019, probability = TRUE),
+  predict(svm_model, test_smote, probability = TRUE),
   "probabilities"
 )[, "Yes"]
 
 # ROCR performance objects
-pred_svm <- prediction(svm_prob, test2019$Wildfire)
+pred_svm <- prediction(svm_prob, test_smote$Wildfire)
 perf_svm <- performance(pred_svm, "tpr", "fpr")
 
 # Plot ROC curve
@@ -465,22 +351,20 @@ svm_auc
 ```
 
 ### 3.3.3 Random Forest
-random forest
 
 ```{r}
 # Random Forest on SMOTE balanced data
-set.seed(123)
 
 rf_model <- randomForest(
   Wildfire ~ .,
-  data = train_balanced,
+  data = train_smote,
   ntree = 500,
   importance = TRUE
 )
 
 # Predictions
-rf_pred <- predict(rf_model, test2019)
-rf_cm <- table(Predicted = rf_pred, Actual = test2019$Wildfire)
+rf_pred <- predict(rf_model, test_smote)
+rf_cm <- table(Predicted = rf_pred, Actual = test_smote$Wildfire)
 rf_cm
 
 # Metrics
@@ -500,9 +384,9 @@ c(accuracy = rf_accuracy,
   F1        = rf_f1)
 
 # ROC curve
-rf_prob <- predict(rf_model, test2019, type = "prob")[, "Yes"]
+rf_prob <- predict((rf_model, test_smote) type = "prob")[,"Yes"]
 
-pred <- prediction(rf_prob, test2019$Wildfire)
+pred <- prediction(rf_prob, test_smote$Wildfire)
 perf <- performance(pred, "tpr", "fpr")
 
 # AUC
@@ -540,88 +424,17 @@ imp_df %>%
 ### 3.3.4 Decision Tree
 
 ```{r}
-# data
-path = 'Fire_Incidence_Data 2018-2019.csv'
-data = read.csv(path)
-```
-
-Data Explore
-
-```{r}
-str(data)
-```
-
-```{r}
-data$Wildfire = factor(
-  data$Wildfire,
-  levels = c('No', 'Yes'))
-
-train_2018 = subset(data, Year == 2018, select = -Year)
-test_2019 = subset(data, Year == 2019, select= -Year)
-
-```
-
-
-```{r}
-tree_model = rpart(Wildfire ~ .,
-                    data=train_2018,
-                    method = "class",
-                    control = rpart.control(
-                      minsplit = 50,
-                      cp= 0.001))
-printcp(tree_model)
-
-rpart.plot(tree_model)
-test_2019$tree_pred_class = predict(
-  tree_model,
-  newdata = test_2019,
-  type = "class")
-
-tree_prob = predict(
-  tree_model,
-  newdata = test_2019,
-  type = "prob"
-)
-
-test_2019$tree_prob_yes = tree_prob[, "Yes"]
-
-cm_tree <- table(Predicted = test_2019$tree_pred_class,
-                 Actual= test_2019$Wildfire)
-cm_tree
-
-TP = cm_tree["Yes", "Yes"]
-FP = cm_tree["Yes", "No"]
-FN = cm_tree["No",  "Yes"]
-TN = cm_tree["No",  "No"]
-
-accuracy  = (TP + TN) / sum(cm_tree)
-precision = TP / (TP + FP)
-recall= TP / (TP + FN)
-f1 <- 2 * precision * recall / (precision + recall)
-View(tree_prob)
-```
-
-SMOTE the data
-```{r}
-X = train_2018[, setdiff(names(train_2018), c("Wildfire", "YEAR"))]
-y = train_2018$Wildfire
-smote_out = SMOTE(X, y, K = 5)
-train_smote = smote_out$data
-colnames(train_smote)[ncol(train_smote)] = "Wildfire"
-
-train_smote$Wildfire = factor(train_smote$Wildfire, levels = c("No", "Yes"))
-
 tree_smote = rpart(Wildfire ~ .,
                    data = train_smote,
                    method = "class",
                    control = rpart.control(minsplit = 50, cp = 0.001))
 
-test_2019$tree_pred_smote = predict(tree_smote,
-                                    newdata = test_2019,
+test_smote$tree_pred_smote = predict(tree_smote,
+                                    newdata = test_smote,
                                     type = "class")
 
-cm_smote = table(Predicted = test_2019$tree_pred_smote,
-                 Actual= test_2019$Wildfire)
+cm_smote = table(Predicted = test_smote$tree_pred_smote,
+                 Actual= test_smote$Wildfire)
 cm_smote
 
 TP_s = cm_smote["Yes", "Yes"]
@@ -646,22 +459,23 @@ Pruning tree
 ```{r}
 printcp(tree_smote)
 
-best_cp <- tree_smote$cptable[which.min(tree_smote$cptable[, "xerror"]), "CP"]
+best_cp = tree_smote$cptable[which.min(tree_smote$cptable[, "xerror"]), "CP"]
 
 best_cp
 
+tree_pruned = rpart::prune(tree_smote, cp = best_cp)
 
 rpart.plot(tree_pruned,type = 1,extra = 1,cex = 0.4,faclen = 3)
 
-test_2019$tree_pred_pruned <- predict(
+test_smote$tree_pred_pruned <- predict(
   tree_pruned,
-  newdata = test_2019,
+  newdata = test_smote,
   type = "class"
 )
 
 cm_pruned <- table(
-  Predicted = test_2019$tree_pred_pruned,
-  Actual    = test_2019$Wildfire
+  Predicted = test_smote$tree_pred_pruned,
+  Actual    = test_smote$Wildfire
 )
 cm_pruned
 
@@ -688,53 +502,6 @@ The recall is still much higher than the original (non-SMOTE) model, but the fal
 
 ### 3.3.5 Logistic Regression
 
-logistic Regression
-```{r}
-logit_model = glm(Wildfire ~.,
-                  data = train_2018,
-                  family = binomial)
-summary(logit_model)
-```
-
-cutoff 0.5
-
-```{r}
-test_2019$prob_yes = predict(logit_model,
-                              newdata = test_2019,
-                              type = "response")
-
-test_2019$pred = ifelse(test_2019$prob_yes >= 0.5, "Yes", "No")
-test_2019$pred = factor(test_2019$pred, levels = c("No","Yes"))
- 
-cm = table(Predicted = test_2019$pred, Actual= test_2019$Wildfire)
-cm
-```
-
-cutoff 0.1
-
-```{r}
-test_2019$pred = ifelse(test_2019$prob_yes >= 0.1, "Yes", "No")
-cm = table(Predicted = test_2019$pred, Actual= test_2019$Wildfire)
-cm
-```
-
-cutoff 0.2
-
-```{r}
-test_2019$pred = ifelse(test_2019$prob_yes >= 0.2, "Yes", "No")
-cm = table(Predicted = test_2019$pred, Actual= test_2019$Wildfire)
-cm
-```
-
-cutoff 0.3
-
-```{r}
-test_2019$pred = ifelse(test_2019$prob_yes >= 0.3, "Yes", "No")
-cm = table(Predicted = test_2019$pred, Actual= test_2019$Wildfire)
-cm
-```
-
-
 logistic regression with SMOTE
 
 ```{r}
@@ -746,9 +513,9 @@ logit_smote_model <- glm(
 
 summary(logit_smote_model)
 
-test_2019$prob_yes_smote <- predict(
+test_smote$prob_yes_smote <- predict(
   logit_smote_model,
-  newdata = test_2019,
+  newdata = test_smote,
   type   = "response"
 )
 
@@ -785,8 +552,8 @@ cutoffs <- c(0.1, 0.2, 0.3, 0.5)
 results_logit_smote <- t(
   sapply(cutoffs, function(c) {
     eval_cutoff(
-      prob   = test_2019$prob_yes_smote,
-      actual = test_2019$Wildfire,
+      prob   = test_smote$prob_yes_smote,
+      actual = test_smote$Wildfire,
       cutoff = c
     )
   })
@@ -825,7 +592,7 @@ Test stronger models: XGBoost, Gradient Boosting, ensembles
 
 Use spatial and temporal cross-validation for better generalization
 
-## REFERENCES 
+# REFERENCES 
 Abatzoglou, J. T., & Williams, A. P. (2016). Impact of anthropogenic climate change on wildfire across western US forests. Proceedings of the National Academy of Sciences, 113(42), 11770–11775. https://doi.org/10.1073/pnas.1607171113
 
 Boulesteix, A.-L., Janitza, S., Kruppa, J., & König, I. R. (2018). Overview of machine learning methods for environmental data analysis. WIREs Data Mining and Knowledge Discovery, 8(6), e1240. https://doi.org/10.1002/widm.1240
