@@ -52,15 +52,45 @@ options(scientific = TRUE, digits = 3)
 
 ## 1.0 Overview
 
+Wildfires have become an increasingly severe environmental and societal challenge, driven by changing climate patterns, prolonged droughts, and expanding human activity. In recent years, wildfire incidents have intensified in both frequency and severity, resulting in substantial ecological damage, economic loss, and threats to human life. Accurate and timely prediction of wildfire occurrence is therefore a critical component of disaster preparedness and risk mitigation.
+
+This study focuses on forecasting wildfire events using climate and spatial indicators derived from United States wildfire incidence data from 2018 to 2019. By applying multiple machine learning classification techniques, the research seeks to uncover relationships between climatic variables such as temperature, humidity, radiation, and precipitation and the likelihood of wildfire occurrence. A comparative modeling framework is used to evaluate how different algorithms perform under realistic conditions, particularly in the presence of extreme class imbalance between wildfire and non wildfire events.
+
 ## 1.1 Objectives
+The primary objectives of this study are:
+
+1).To develop and train multiple machine learning classification models including Logistic Regression, K Nearest Neighbors, Support Vector Machines, Decision Trees, and Random Forests to predict wildfire occurrence using climate and spatial features.
+
+2).To evaluate and compare model performance using classification metrics such as accuracy, precision, recall, F1 score, Kappa, and ROC AUC, with particular emphasis on minority class detection.
+
+3).To identify the most influential climate variables contributing to wildfire occurrence through model interpretation methods such as feature importance analysis.
 
 ## 1.2 Research Questions
+This study is guided by the following research questions:
+
+1).Can machine learning models accurately predict wildfire occurrence using climate and spatial indicators when trained on 2018 data and evaluated on 2019 data?
+
+2).How do different machine learning algorithms compare in their ability to detect wildfire events under highly imbalanced data conditions?
+
+3).Which climate related variables most strongly influence the likelihood of wildfire occurrence?
 
 ## 1.3 Significance of the Study
 
+This research contributes to the literature on climate driven wildfire prediction by providing a comparative evaluation of multiple machine learning approaches using real world temporally split data. Unlike studies that rely primarily on overall accuracy, this work emphasizes performance metrics that are critical for detecting rare wildfire events.
+
+From a practical standpoint, the findings offer insights into how climate indicators can support early warning systems and wildfire risk assessment. Identifying influential predictors and understanding model strengths can assist policymakers, environmental agencies, and emergency response teams in developing targeted prevention and monitoring strategies. Additionally, the study demonstrates a reproducible machine learning workflow in R that follows best practices for handling imbalanced environmental datasets.
+
 ## 1.4 Weaknesses of the Study
 
+Despite its contributions, this study has several limitations. First, the dataset primarily includes climate variables and lacks important contextual information such as vegetation dryness, land cover characteristics, and indicators of human activity. The absence of these factors may limit the models’ ability to fully capture the complex causes of wildfire events.
+
+Second, the analysis relies on a single temporal split with 2018 used for training and 2019 used for testing. While this setup reflects realistic forecasting conditions, it may reduce generalizability due to year to year climate variability. Finally, although multiple algorithms were evaluated, extensive hyperparameter tuning was limited in order to maintain interpretability and manage computational complexity.
+
 ### 1.4.1 Imbalanced Data
+
+A major challenge in this study is the extreme class imbalance between wildfire and non wildfire observations. Wildfire events constitute a very small proportion of the dataset, allowing baseline models to achieve deceptively high accuracy by predominantly predicting the majority No class. As a result, these models perform poorly in identifying actual wildfire occurrences, leading to low recall and precision for the positive class.
+
+To address this issue, imbalance handling techniques such as upsampling and the Synthetic Minority Oversampling Technique were applied to the training data. While these approaches improved the models’ ability to detect wildfire events, they also increased the number of false positives, highlighting the trade off between recall and precision in rare event prediction. This limitation underscores the importance of careful metric selection and cautious interpretation of results when working with highly imbalanced classification problems.
 
 # CHAPTER 2: EDA
 
@@ -303,7 +333,8 @@ autoplot(roc_obj_smote) +
 ```
 
 ### 3.3.2 SVM
-1. data
+
+1. Data Explore
 ```{r}
 
 data_clean <- read.csv("Fire_Incidence_Data 2018-2019.csv")
