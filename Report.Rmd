@@ -55,45 +55,37 @@ options(scientific = TRUE, digits = 3)
 
 ## 1.0 Overview
 
-Wildfires have become an increasingly severe environmental and societal challenge, driven by changing climate patterns, prolonged droughts, and expanding human activity. In recent years, wildfire incidents have intensified in both frequency and severity, resulting in substantial ecological damage, economic loss, and threats to human life. Accurate and timely prediction of wildfire occurrence is therefore a critical component of disaster preparedness and risk mitigation.
+Wildfires have become an increasingly severe environmental and societal challenge, driven by changing climate patterns, prolonged droughts, and expanding human activity. In recent years, wildfire incidents have increased in both frequency and severity, resulting in substantial ecological damage, economic loss, and risks to human life. Accurate prediction of wildfire occurrence is therefore a critical component of disaster preparedness and risk mitigation.
 
-This study focuses on forecasting wildfire events using climate and spatial indicators derived from United States wildfire incidence data from 2018 to 2019. By applying multiple machine learning classification techniques, the research seeks to uncover relationships between climatic variables such as temperature, humidity, radiation, and precipitation and the likelihood of wildfire occurrence. A comparative modeling framework is used to evaluate how different algorithms perform under realistic conditions, particularly in the presence of extreme class imbalance between wildfire and non wildfire events.
+This study focuses on forecasting wildfire events using climate and spatial indicators derived from U.S. wildfire incidence data from 2018 to 2019. Multiple machine learning classification models are applied to examine how climate variables such as temperature, humidity, radiation, and precipitation relate to wildfire occurrence. A key challenge addressed in this study is the extreme class imbalance between wildfire and non-wildfire events, which complicates reliable model evaluation and motivates the use of recall-focused performance metrics.
+
+This study also emphasizes interpretability by examining feature importance and detection trade-offs across models.
 
 ## 1.1 Objectives
 The primary objectives of this study are:
 
-1).To develop and train multiple machine learning classification models including Logistic Regression, K Nearest Neighbors, Support Vector Machines, Decision Trees, and Random Forests to predict wildfire occurrence using climate and spatial features.
+1) To develop and train multiple machine learning classification models, including Logistic Regression, K-Nearest Neighbors, Support Vector Machines, Decision Trees, and Random Forests, to predict wildfire occurrence using climate and spatial features.
 
-2).To evaluate and compare model performance using classification metrics such as accuracy, precision, recall, F1 score, Kappa, and ROC AUC, with particular emphasis on minority class detection.
+2) To evaluate and compare model performance using metrics such as accuracy, precision, recall, F1-score, Kappa, and ROC-AUC, with particular emphasis on minority class detection.
 
-3).To identify the most influential climate variables contributing to wildfire occurrence through model interpretation methods such as feature importance analysis.
+3) To identify influential climate variables associated with wildfire occurrence through model interpretation techniques such as feature importance analysis.
 
 ## 1.2 Research Questions
 This study is guided by the following research questions:
 
-1).Can machine learning models accurately predict wildfire occurrence using climate and spatial indicators when trained on 2018 data and evaluated on 2019 data?
+1) Can machine learning models predict wildfire occurrence using climate and spatial indicators when trained on 2018 data and evaluated on 2019 data?
 
-2).How do different machine learning algorithms compare in their ability to detect wildfire events under highly imbalanced data conditions?
+2) How do different machine learning algorithms compare in their ability to detect wildfire events under highly imbalanced data conditions?
 
-3).Which climate related variables most strongly influence the likelihood of wildfire occurrence?
+3) Which climate-related variables most strongly influence the likelihood of wildfire occurrence?
+
+This study is primarily prediction-focused, aiming to assess how well machine learning models can identify wildfire occurrence under realistic forecasting conditions rather than to infer causal relationships.
 
 ## 1.3 Significance of the Study
 
-This research contributes to the literature on climate driven wildfire prediction by providing a comparative evaluation of multiple machine learning approaches using real world temporally split data. Unlike studies that rely primarily on overall accuracy, this work emphasizes performance metrics that are critical for detecting rare wildfire events.
+This research contributes to the literature on climate-driven wildfire prediction by providing a comparative evaluation of multiple machine learning approaches using temporally split real-world data. Rather than relying solely on overall accuracy, this study emphasizes evaluation metrics that are critical for detecting rare wildfire events.
 
-From a practical standpoint, the findings offer insights into how climate indicators can support early warning systems and wildfire risk assessment. Identifying influential predictors and understanding model strengths can assist policymakers, environmental agencies, and emergency response teams in developing targeted prevention and monitoring strategies. Additionally, the study demonstrates a reproducible machine learning workflow in R that follows best practices for handling imbalanced environmental datasets.
-
-## 1.4 Weaknesses of the Study
-
-Despite its contributions, this study has several limitations.
-
-First, the dataset primarily includes climate variables and lacks important contextual information. The absence of these factors may limit the models’ ability to fully capture the complex causes of wildfire events.
-
-Second, the analysis relies on a single temporal split with 2018 used for training and 2019 used for testing. While this setup reflects realistic forecasting conditions, it may reduce generalizability due to year to year climate variability. Finally, although multiple algorithms were evaluated, extensive hyperparameter tuning was limited in order to maintain interpretability and manage computational complexity.
-
-A major challenge in this study is the extreme class imbalance between wildfire and non wildfire observations. Wildfire events constitute a very small proportion of the dataset, allowing baseline models to achieve deceptively high accuracy by predominantly predicting the majority No class. As a result, these models perform poorly in identifying actual wildfire occurrences, leading to low recall and precision for the positive class.
-
-To address this issue, imbalance handling techniques such as upsampling and the Synthetic Minority Oversampling Technique were applied to the data. While these approaches improved the models’ ability to detect wildfire events, they also increased the number of false positives, highlighting the trade off between recall and precision in rare event prediction. This limitation underscores the importance of careful metric selection and cautious interpretation of results when working with highly imbalanced classification problems.
+From a practical perspective, the findings offer insights into how climate indicators can support early warning systems and wildfire risk assessment. Identifying influential predictors and understanding model behavior can assist policymakers, environmental agencies, and emergency response teams in developing more targeted prevention and monitoring strategies. The study also demonstrates a reproducible machine learning workflow in R that follows best practices for handling imbalanced environmental datasets.
 
 # CHAPTER 2: EDA
 
@@ -117,9 +109,7 @@ ggplot(ratio_df, aes(x = Wildfire, y = percent, fill = Wildfire)) +
   theme_minimal(base_size = 14) +
   theme(legend.position = "none")
 ```
-The class distribution shows a severe imbalance, with wildfire events occurring far less frequently than non-wildfire cases.
-
-This imbalance explains why accuracy alone would be misleading, as a model could achieve high accuracy while failing to detect wildfire events. Addressing this imbalance is therefore essential for evaluating a model’s ability to identify wildfires rather than simply predicting the majority class.
+The dataset is highly imbalanced, with far fewer wildfire events than non-wildfire cases. This motivates imbalance handling and recall-focused evaluation in later sections.
 
 Correlation Matrix
 ```{r}
@@ -130,9 +120,7 @@ corr_mat <- cor(num_vars, method = "pearson")
 corrplot(corr_mat, method = "number", type="upper",
          tl.col="black", title="Correlation Matrix (Climate Variables)")
 ```
-The correlation matrix reveals moderate relationships among several climate variables, particularly those related to temperature and moisture.
-
-While no single pair shows extreme correlation, these patterns suggest partial redundancy among predictors and highlight the risk of multicollinearity. As a result, model performance should be interpreted holistically rather than relying on individual coefficients.
+Several climate variables show moderate correlation, indicating partially overlapping information among predictors.
 
 # CHAPTER 3: Methodology
 
@@ -144,8 +132,8 @@ model = data %>%
          Wildfire = factor(Wildfire, levels = c('No','Yes')))%>%
   tidyr::drop_na()
 
-table(data$Wildfire)
-table(data$Year)
+table(model$Wildfire)
+table(model$Year)
 ```
 
 ## 3.2 Train & Test split(SMOTE)
@@ -188,6 +176,9 @@ table(test_smote$Wildfire)
 ```
 
 After applying SMOTE, the class counts become balanced, which prevents evaluation metrics from being dominated by the majority class. This allows model performance to be compared more directly in terms of wildfire detection ability and error trade-offs.
+
+SMOTE was applied consistently to both training and test sets to allow fair comparison across models under balanced evaluation conditions.
+
 
 ## 3.3 Modeling strategy
 
@@ -241,7 +232,7 @@ estimate = .pred_class
 )
 ```
 
-After applying upsampling to address class imbalance, the KNN model demonstrated an improved ability to detect wildfire events. Although some misclassification remains, the model shows a substantial improvement compared to the imbalanced version, which failed to detect any wildfire events. This result highlights the importance of addressing class imbalance in wildfire prediction tasks.
+KNN shows moderate wildfire detection after SMOTE, but recall remains limited, indicating many missed wildfire events.
 
 6. Classification Metrics (Accuracy, Recall, Precision, F1)
 
@@ -263,19 +254,7 @@ knn_metrics(
 
 While the model achieves relatively high precision, recall remains moderate, indicating that a substantial number of wildfire events are still misclassified as non-wildfire. This suggests that KNN tends to be conservative in issuing wildfire predictions, favoring precision over sensitivity, which limits its usefulness in high-risk detection scenarios.
 
-7. Kappa
-```{r kappa_wildfire}
-metric_set(kap)(
-  knn_predictions,
-  truth = Wildfire,
-  estimate = .pred_class,
-  event_level = "second"   # "Yes" (Wildfire) is the positive class
-)
-```
-
-Although the KNN model achieved high accuracy, the very low Kappa value confirms that its predictive power for wildfire occurrence is weak and only marginally better than random guessing.
-
-8. ROC-AUC 
+7. ROC-AUC 
 
 ```{r knn-prob}
 # Get predicted probabilities for both classes
@@ -298,13 +277,9 @@ autoplot(roc_obj) +
 
 ```
 
-The ROC curve for the KNN model does not show strong curvature toward the top-left corner, suggesting limited ranking ability across classification thresholds. This result implies that while KNN captures some signal from the climate variables, its overall discriminative power remains modest compared to more flexible models.
+The ROC curve suggests modest discriminative ability, consistent with the confusion matrix results.
 
 ### 3.3.2 SVM
-
-The SVM model is designed to find a decision boundary that maximizes separation between wildfire and non-wildfire cases in the feature space.
-
-By allowing a flexible margin, the model can capture non-linear relationships among climate variables that simpler linear models may miss. This makes SVM a strong candidate for comparison in this wildfire classification task.
 
 ```{r}
 svm_model <- svm(
@@ -342,9 +317,6 @@ c(
 )
 ```
 
-The SVM model achieves moderate improvements in recall and F1-score compared to KNN, indicating better sensitivity to wildfire events under SMOTE-balanced conditions. However, a substantial number of wildfire cases are still misclassified, suggesting that the model does not fully resolve the detection challenge posed by highly imbalanced wildfire data
-
-
 ```{r}
 # Probability prediction
 svm_prob <- attr(
@@ -365,7 +337,7 @@ svm_auc <- performance(pred_svm, "auc")@y.values[[1]]
 svm_auc
 ```
 
-The ROC curve for the SVM model is smoother than that of KNN, reflecting more stable probability ranking across thresholds. However, the overall separation from the diagonal remains limited, and the curve does not indicate a dramatic improvement in discriminative power. This suggests that while SVM captures additional non-linear structure in the data, its overall ranking performance is only marginally better than KNN.
+SVM improves recall and F1 slightly compared to KNN, but many wildfire cases are still missed. The ROC curve indicates only marginal ranking improvement, so the gain over KNN is limited.
 
 ### 3.3.3 Random Forest
 
@@ -405,7 +377,6 @@ c(accuracy = rf_accuracy,
 
 ```
 
-
 ```{r}
 # ROC curve
 rf_prob <- predict(rf_model, newdata=test_smote, type = "prob")[,"Yes"]
@@ -423,7 +394,7 @@ plot(perf, col = "blue", lwd = 2, main = "Random Forest ROC Curve")
 abline(0, 1, lty = 2, col = "gray")
 ```
 
-The Random Forest ROC curve shows strong performance, with the curve approaching the upper-left corner of the plot. The high AUC value indicates excellent overall ranking ability, meaning the model is effective at assigning higher probabilities to wildfire events than non-wildfire cases. Despite this strong performance, the confusion matrix reveals that recall remains constrained, highlighting a trade-off between ranking performance and classification sensitivity under the chosen threshold.
+Random Forest achieves strong overall performance and the best ROC ranking ability, but recall remains only moderate under the chosen threshold. This limits its suitability when minimizing missed wildfire events is the primary objective.
 
 ### 3.3.4 Decision Tree
 
@@ -459,11 +430,8 @@ recall_s
 f1_s
 
 ```
+Because SMOTE can introduce synthetic noise, pruning is used to reduce overfitting and improve generalization.
 
-The decision tree model improves interpretability by explicitly modeling decision rules based on climate variables. Compared to logistic regression, the tree demonstrates improved recall, indicating better sensitivity to wildfire events. However, this gain is accompanied by increased false positives, reflecting a trade-off between detection and over-alerting.
-
-smote data has a high risk of noise
-Pruning tree
 ```{r}
 printcp(tree_smote)
 
@@ -510,7 +478,7 @@ tree_prob <- data.frame(
 )
 ```
 
-Pruning reduces model complexity and helps prevent overfitting to the training data. The pruned tree shows more balanced performance, with slightly reduced recall but improved generalization. This suggests that controlling model complexity leads to more stable wildfire predictions under balanced evaluation conditions.
+After pruning, the decision tree shows more balanced performance, with reduced false positives and improved generalization compared to the unpruned model. Although recall decreases slightly, the overall trade-off between precision and recall becomes more stable, indicating that pruning effectively controls overfitting while preserving the model’s ability to detect wildfire events.
 
 ```{r}
 # Create ROC object
@@ -534,6 +502,7 @@ autoplot(roc_dt) +
   ggtitle("ROC Curve for Pruned Decision Tree (2019)") +
   theme_minimal()
 ```
+The ROC curve for the pruned decision tree indicates moderate to strong discriminative ability. While its AUC is lower than that of the Random Forest, the curve demonstrates consistent separation across thresholds. This supports the use of the decision tree as a final model, balancing interpretability with acceptable predictive performance in wildfire detection.
 
 ### 3.3.5 Logistic Regression
 
@@ -548,7 +517,7 @@ logit_smote_model <- glm(
 
 summary(logit_smote_model)
 ```
-The logistic regression model provides a transparent baseline for wildfire prediction. While it captures general trends in the data, its recall remains limited, indicating difficulty in identifying wildfire events under a linear decision boundary. This result suggests that more flexible, non-linear models may be better suited for capturing complex wildfire–climate relationships..
+Several climate predictors are statistically significant, but the model’s linear form limits its ability to capture non-linear wildfire patterns. As a result, wildfire detection performance remains weaker than tree-based models.
 
 ```{r}
 test_smote$prob_yes_smote <- predict(
@@ -610,7 +579,7 @@ logit_prob <- data.frame(
 )
 
 ```
-The confusion matrix shows that a substantial portion of wildfire cases are misclassified as non-wildfire, resulting in lower recall. Although false positives are relatively controlled, the cost of missed wildfire detections is high in this context. Therefore, recall is prioritized over overall accuracy for model evaluation.
+Lower cutoffs improve recall at the expense of precision, with the 0.1 threshold showing signs of overfitting due to excessive false positives. Higher cutoffs yield more stable performance, underscoring the need for careful cutoff selection in wildfire detection. Therefore, a cutoff of 0.5 was chosen as the final cutoff to ensure balanced and stable performance.
 
 ```{r}
 # Create ROC object
@@ -636,17 +605,19 @@ autoplot(roc_logit) +
   ggtitle("ROC Curve for Logistic Regression (2019)") +
   theme_minimal()
 ```
+The ROC curve for logistic regression indicates limited discriminative power, reflecting the constraints of a linear model in capturing complex wildfire patterns.
+
 # CHAPTER 4: Conclusion & Future Works
 
 ## 4.1 Summary of Findings
 
-Our analysis examined the relationship between climate variables and wildfire occurrence.
-The primary challenge was the extreme class imbalance, which caused most baseline models to fail at detecting wildfire events.
-SMOTE-based preprocessing improved the model's ability to learn the minority class, allowing us to evaluate which algorithms performed best in predicting wildfire events.
+This study compared multiple machine learning models for wildfire prediction under severe class imbalance. While several models showed reasonable performance, their strengths differed depending on the evaluation metric. Models with strong ranking ability did not always achieve high recall, highlighting the importance of metric selection. Overall, the pruned decision tree provided the most balanced trade-off between wildfire detection performance, generalization, and interpretability.
 
 ## 4.2 Best Performing Model and Justification
 
-Comparing Recall & F1 Score
+In selecting the best-performing model, recall was prioritized as the primary evaluation criterion, as failing to detect wildfire events carries greater risk than issuing false alarms. F1-score was considered alongside recall to account for the trade-off between sensitivity and precision, while ROC curves were used as a supporting metric to assess overall ranking ability across cutoffs. Based on this evaluation framework, models were compared to identify the approach that best balances wildfire detection performance, generalization, and interpretability.
+
+### 4.2.1. Comparing Recall & F1 Score
 ```{r}
 logit_prob <- predict(logit_smote_model, newdata = test_smote, type = "response")
 logit_prob <- as.numeric(logit_prob)
@@ -683,14 +654,17 @@ ggplot(metrics_df, aes(x=model, y=.estimate, fill=.metric)) + geom_col(position 
   title = 'Comparing Recall and F1 Score Across Models(SMOTE-balanced)',
   x='Models',
   y='Score',
-  fil='Metric'
+  fill='Metric'
 )+
   theme_minimal(base_size=14) +
-  theme(axis.test.x = element_text(angle=25, hjust=1))
+  theme(axis.text.x = element_text(angle=25, hjust=1))
 ```
+Across models, the pruned decision tree provides the best balance between recall and F1-score while remaining interpretable. Although Random Forest performs strongly overall, its recall is not consistently higher under the selected threshold, supporting the decision tree as the final model.
 
+### 4.2.2 Comparing AUC-ROC
 
-Comparing AUC-ROC
+ROC analysis is used here as a supporting comparison metric rather than a primary selection criterion.
+
 ```{r}
 rm(roc_df)
 gc()
@@ -754,6 +728,9 @@ ggplot(roc_data, aes(x=1-specificity, y=sensitivity, color=model)) +
 
 ```
 
+The ROC curves show that Random Forest achieves the strongest overall ranking performance, while SVM and KNN exhibit more limited separation from the diagonal. The decision tree demonstrates competitive ranking ability without relying on ensemble complexity. Although ROC performance alone does not determine the final model choice, this comparison supports the decision tree as a balanced model when considered alongside recall, F1-score, and interpretability.
+
+### 4.2.3. Feature Importance Interpretation(Decision Tree)
 
 ```{r}
 # Variable importance
@@ -779,22 +756,27 @@ imp_df %>%
 
 ```
 
+The feature importance results indicate that variables related to atmospheric dryness, temperature, and fuel moisture play a central role in the decision tree’s wildfire predictions. These variables contribute most to the model’s split decisions, suggesting that climate-driven dryness conditions are key drivers of wildfire occurrence. The clear ranking of features also enhances interpretability, supporting the selection of the decision tree as the final model.
+
+These results should be interpreted as model-specific importance rather than causal effects.
+
 ## 4.3 Limitations of the Study
 
-Despite improvements with SMOTE, the models still struggled to achieve high precision, indicating difficulty in correctly distinguishing non-wildfire events from actual fires.
+- Despite improvements with SMOTE, the models still struggled to achieve high precision, indicating difficulty in correctly distinguishing non-wildfire events from actual fires.
 
-In addition, the dataset contains limited feature diversity, relying primarily on climate variables, without incorporating vegetation dryness, human activity, or land cover features.
+- The dataset contains limited feature diversity, relying primarily on climate variables, without incorporating vegetation dryness, human activity, or land cover features.
 
-Finally, the temporal split (2018 train / 2019 test) reflects real-world conditions but introduces year-to-year variability that may reduce generalizability.
+- The temporal split (2018 train / 2019 test) reflects real-world conditions but introduces year-to-year variability that may reduce generalizability.
 
 ## 4.4 Future Works
-Add more features: vegetation dryness, land cover, human activity
 
-Explore advanced imbalance handling 
+- Add more features: vegetation dryness, land cover, human activity
 
-Test stronger models: XGBoost, Gradient Boosting, ensembles
+- Explore advanced imbalance handling 
 
-Use spatial and temporal cross-validation for better generalization
+- Test stronger models: XGBoost, Gradient Boosting, ensembles
+
+- Use spatial and temporal cross-validation for better generalization
 
 # REFERENCES 
 Abatzoglou, J. T., & Williams, A. P. (2016). Impact of anthropogenic climate change on wildfire across western US forests. Proceedings of the National Academy of Sciences, 113(42), 11770–11775. https://doi.org/10.1073/pnas.1607171113
