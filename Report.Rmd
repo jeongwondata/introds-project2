@@ -113,14 +113,22 @@ The dataset is highly imbalanced, with far fewer wildfire events than non-wildfi
 
 Correlation Matrix
 ```{r}
-num_vars <- data[, c("pr","rmax","rmin","sph","srad","tmmn")]
+num_vars <- data%>%dplyr::select(where(is.numeric))
 
 corr_mat <- cor(num_vars, method = "pearson")
 
-corrplot(corr_mat, method = "number", type="upper",
-         tl.col="black", title="Correlation Matrix (Climate Variables)")
+options(repr.plot.width = 14, repr.plot.height = 12)
+
+corrplot(
+  corr_mat,
+  method = "number",
+  type = "upper",
+  tl.col = "black",
+  number.cex = 0.7,
+  tl.cex = 0.8
+)
 ```
-Several climate variables show moderate correlation, indicating partially overlapping information among predictors.
+Strong correlation clusters are observed among temperature (tmmn–tmmx), fuel moisture (fm100–fm1000), and atmospheric demand variables (etr, pet, vpd), indicating partially overlapping information among predictors.
 
 # CHAPTER 3: Methodology
 
